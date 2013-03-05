@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>MPEG-TS Parser demo</title>
+    <script src="/jDataView/src/jdataview.js"></script>
+    <script src="/jParser/src/jparser.js"></script>
+    <script src="mpegts.js"></script>
+</head>
+<body>
+    <script>
+        var mpegts = MPEGTS.readFrom('sample_mpeg4.ts', function () {
+            this.readPacket(1);
+            console.log(this.readPacket(2));
+        });
+    </script>
+</body>
+</html>
