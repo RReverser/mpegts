@@ -5,13 +5,19 @@
     <script src="/jDataView/src/jdataview.js"></script>
     <script src="/jParser/src/jparser.js"></script>
     <script src="mpegts.js"></script>
+    <style type="text/css">
+        #jsonContainer { color: #333; font-style: italic; }
+        .jsonValue { color: #000; font-weight: bold; font-style: normal; }
+    </style>
 </head>
 <body>
+    <pre id="jsonContainer">
+    </pre>
     <script>
         var mpegts = MPEGTS.readFrom('sample_mpeg4.ts', function () {
             this.readPacket(1); // PAT
             this.readPacket(2); // PMT
-            console.log(this.readPacket(3)); // PES
+            document.getElementById('jsonContainer').innerHTML = JSON.stringify(this.readPacket(3), function (key, value) { return typeof value === 'object' ? value : '<span class=jsonValue>' + value + '</span>' }, '    '); // PES
         });
     </script>
 </body>
