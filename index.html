@@ -9,8 +9,9 @@
 <body>
     <script>
         var mpegts = MPEGTS.readFrom('sample_mpeg4.ts', function () {
-            this.readPacket(1);
-            console.log(this.readPacket(2));
+            this.readPacket(1); // PAT
+            this.readPacket(2); // PMT
+            console.log(this.readPacket(3)); // PES
         });
     </script>
 </body>
