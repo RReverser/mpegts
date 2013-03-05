@@ -6,8 +6,8 @@
     <script src="/jParser/src/jparser.js"></script>
     <script src="mpegts.js"></script>
     <style type="text/css">
-        #jsonContainer { color: #333; font-style: italic; }
-        .jsonValue { color: #000; font-weight: bold; font-style: normal; }
+        #jsonContainer { color: #733; font-style: italic; word-wrap: break-word; }
+        .jsonValue { color: #373; font-weight: bold; font-style: normal; }
     </style>
 </head>
 <body>
@@ -17,7 +17,23 @@
         var mpegts = MPEGTS.readFrom('sample_mpeg4.ts', function () {
             this.readPacket(1); // PAT
             this.readPacket(2); // PMT
-            document.getElementById('jsonContainer').innerHTML = JSON.stringify(this.readPacket(3), function (key, value) { return typeof value === 'object' ? value : '<span class=jsonValue>' + value + '</span>' }, '    '); // PES
+            document.getElementById('jsonContainer').innerHTML = // PES
+                JSON.stringify(
+                    this.readPacket(3),
+                    function (key, value) {
+                        if (value === undefined || key[0] === '_') return undefined;
+
+                        if (value instanceof Array && (typeof value[0] === 'number')) {
+                            value = value.map(function (value) {
+                                var str = value.toString(16).toUpperCase();
+                                return str.length == 2 ? str : '0' + str;
+                            }).join(' ');
+                        }
+
+                        return value instanceof Object ? value : '<span class=jsonValue>' + value + '</span>';
+                    },
+                    '    '
+                );
         });
     </script>
 </body>
