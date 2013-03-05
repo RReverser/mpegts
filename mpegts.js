@@ -209,7 +209,7 @@ MPEGTS.structure = {
                 if (this.current.header.pid < 2 || this.current.header.pid in mpegts.pat) {
                     return this.parse(['TSPrivateSection', mpegts, this.current.header]);
                 }
-                if (this.current.header.pid in mpegts.pmt) {
+                if (this.current.header.payloadStart && this.current.header.pid in mpegts.pmt) {
                     return this.parse('PES');
                 }
                 return this.parse(['array', 'uint8', 188 - (this.tell() - this.current._startof)]);

@@ -17,9 +17,10 @@
         var mpegts = MPEGTS.readFrom('sample_mpeg4.ts', function () {
             this.readPacket(1); // PAT
             this.readPacket(2); // PMT
+            this.readPacket(3);
             document.getElementById('jsonContainer').innerHTML = // PES
                 JSON.stringify(
-                    this.readPacket(3),
+                    this.readPacket(4),
                     function (key, value) {
                         if (value === undefined || key[0] === '_') return undefined;
 
