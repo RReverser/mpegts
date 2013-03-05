@@ -92,11 +92,41 @@ MPEGTS.structure = {
     }],
 
     PES: {
-        prefix: ['array', 'uint8', 3],
+        prefix: function () {
+            var prefix = this.parse(['array', 'uint8', 3]);
+            if (!(prefix[0] == 0x00 && prefix[1] == 0x00 && prefix[2] == 0x01)) {
+                throw new TypeError('Corrupted PES packet.');
+            }
+            return prefix;
+        },
         streamId: 'uint8',
         length: 'uint16',
+        extension: function () {
+            if (this.current.streamId == 0xBE || this.current.streamId == 0xBF) return;
+            var extension = this.parse(['bitfield', {
+                prefix: 2,
+                scramblingControl: 2,
+                priority: 1,
+                dataAlignment: 1,
+                hasCopyright: 1,
+                isOriginal: 1,
+                ptsdts: 2,
+                hasESCR: 1,
+                hasESRate: 1,
+                dsmTrickMode: 1,
+                extraCopyInfo: 1,
+                hasPESCRC: 1,
+                hasPESExtension: 1,
+                length: 8
+            }]);
+            if (extension.prefix != 2) {
+                throw new TypeError('Corrupted PES extension.');
+            }
+            this.skip(extension.length);
+            return extension;
+        },
         others: function () {
-            return this.parse(['array', 'uint8', this.current.length]);
+            return this.parse(['array', 'uint8', this.current.length - this.current.extension.length - 3]);
         }
     },
 
