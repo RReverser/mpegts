@@ -22,7 +22,7 @@
                 JSON.stringify(
                     this.readPacket(4),
                     function (key, value) {
-                        if (value === undefined || key[0] === '_') return undefined;
+                        if (key[0] === '_') return undefined;
 
                         if (value instanceof Array && (typeof value[0] === 'number')) {
                             value = value.map(function (value) {

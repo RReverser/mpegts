@@ -14,12 +14,18 @@ MPEGTS.prototype.readPacket = function (index) {
 };
 
 MPEGTS.structure = {
+    expect: function (type, value, errorMsg) {
+        if (this.parse(type) != value) {
+            throw new TypeError(errorMsg);
+        }
+    },
+
     PCR: function () {
-        var pcr = this.parse(['bitfield', {
+        var pcr = this.parse({
             base: 33,
             _reserved: 6,
             extension: 9
-        }]);
+        });
         return 300 * (300 * pcr.base + pcr.extension);
     },
 
@@ -30,29 +36,31 @@ MPEGTS.structure = {
 
     TSAdaptationHeader: {
         length: 'uint8',
-        flags: ['bitfield', {
-            discontinuity: 1,
-            randomAccess: 1,
-            priority: 1,
-            hasPCR: 1,
-            hasOPCR: 1,
-            hasSplicingPoint: 1,
-            hasTransportPrivateData: 1,
-            hasExtension: 1
-        }]
+        discontinuity: 1,
+        randomAccess: 1,
+        priority: 1,
+        hasPCR: 1,
+        hasOPCR: 1,
+        hasSplicingPoint: 1,
+        hasTransportPrivateData: 1,
+        hasExtension: 1
     },
 
-    TSAdaptationField: {
-        header: 'TSAdaptationHeader',
-        pcr: ['if', function () { return this.current.header.flags.hasPCR }, 'PCR'],
-        opcr: ['if', function () { return this.current.header.flags.hasOPCR }, 'PCR'],
-        spliceCountdown: ['if', function () { return this.current.header.flags.hasSplicingPoint }, 'uint8'],
-        privateData: ['if', function () { return this.current.header.flags.hasTransportPrivateData }, 'Field'],
-        extension: ['if', function () { return this.current.header.flags.hasExtension }, 'Field']
+    TSAdaptationField: function () {
+        var header = this.parse('TSAdaptationHeader');
+        var field = this.parse({
+            pcr: ['if', header.hasPCR, 'PCR'],
+            opcr: ['if', header.hasOPCR, 'PCR'],
+            spliceCountdown: ['if', header.hasSplicingPoint, 'uint8'],
+            privateData: ['if', header.hasTransportPrivateData, 'Field'],
+            extension: ['if', header.hasExtension, 'Field']
+        });
+        field.header = header;
+        return field;
     },
 
-    TSHeader: ['bitfield', {
-        syncByte: 8,
+    TSHeader: {
+        _syncByte: ['expect', 'uint8', 0x47],
 
         transportError: 1,
         payloadStart: 1,
@@ -63,21 +71,17 @@ MPEGTS.structure = {
         hasAdaptationField: 1,
         hasPayload: 1,
         contCounter: 4
-    }],
+    },
 
     PES: {
-        prefix: function () {
-            var prefix = this.parse(['array', 'uint8', 3]);
-            if (!(prefix[0] == 0x00 && prefix[1] == 0x00 && prefix[2] == 0x01)) {
-                throw new TypeError('Corrupted PES packet.');
-            }
-            return prefix;
-        },
+        _prefix0: ['expect', 'uint8', 0x00],
+        _prefix1: ['expect', 'uint8', 0x00],
+        _prefix2: ['expect', 'uint8', 0x01],
         streamId: 'uint8',
         length: 'uint16',
         extension: ['if', function () { return !(this.current.streamId == 0xBE || this.current.streamId == 0xBF) }, function () {
-            var extension = this.parse(['bitfield', {
-                prefix: 2,
+            var extension = this.parse({
+                _prefix: ['expect', 2, 2],
                 scramblingControl: 2,
                 priority: 1,
                 dataAlignment: 1,
@@ -90,11 +94,8 @@ MPEGTS.structure = {
                 extraCopyInfo: 1,
                 hasPESCRC: 1,
                 hasPESExtension: 1,
-                length: 8
-            }]);
-            if (extension.prefix != 2) {
-                throw new TypeError('Corrupted PES extension.');
-            }
+                length: 'uint8'
+            });
             this.skip(extension.length);
             return extension;
         }],
@@ -105,36 +106,34 @@ MPEGTS.structure = {
         return this.parse({
             pointerField: ['if', tsHeader.payloadStart, 'uint8'],
             tableId: 'uint8',
-            flags: ['bitfield', {
-                isLongSection: 1,
-                isPrivate: 1,
-                _reserved: 2,
-                sectionLength: 12
-            }],
+            isLongSection: 1,
+            isPrivate: 1,
+            _reserved: 2,
+            sectionLength: 12,
 
             data: function () {
-                if (!this.current.flags.isLongSection) {
-                    return this.parse(['array', 'uint8', this.current.flags.sectionLength]);
+                if (!this.current.isLongSection) {
+                    return this.parse(['array', 'uint8', this.current.sectionLength]);
                 }
 
-                var header = this.parse(['bitfield', {
-                    tableIdExt: 16,
+                var header = this.parse({
+                    tableIdExt: 'uint16',
                     _reserved: 2,
                     versionNumber: 5,
                     currentNextIndicator: 1,
-                    sectionNumber: 8,
-                    lastSectionNumber: 8
-                }]);
+                    sectionNumber: 'uint8',
+                    lastSectionNumber: 'uint8'
+                });
 
-                var dataLength = this.current.flags.sectionLength - 9, data;
+                var dataLength = this.current.sectionLength - 9, data;
 
                 switch (this.current.tableId) {
                     case 0:
-                        data = this.parse(['array', ['bitfield', {
-                            programNumber: 16,
+                        data = this.parse(['array', {
+                            programNumber: 'uint16',
                             _reserved: 3,
                             pid: 13
-                        }], dataLength / 4]);
+                        }, dataLength / 4]);
 
                         if (header.sectionNumber == 0) {
                             mpegts.pat = {};
@@ -147,29 +146,29 @@ MPEGTS.structure = {
                         break;
 
                     case 2:
-                        data = this.parse(['bitfield', {
+                        data = this.parse({
                             _reserved: 3,
                             pcrPID: 13,
                             _reserved2: 4,
                             programInfoLength: 12
-                        }]);
+                        });
 
                         data.programDescriptors = this.parse(['array', 'uint8', data.programInfoLength]);
                         data.mappings = [];
-                        
+
                         dataLength -= 4 + data.programInfoLength;
 
                         while (dataLength > 0) {
-                            var mapping = this.parse(['bitfield', {
-                                streamType: 8,
+                            var mapping = this.parse({
+                                streamType: 'uint8',
                                 _reserved: 3,
                                 elementaryPID: 13,
                                 _reserved2: 4,
                                 esInfoLength: 12
-                            }]);
+                            });
                             mapping.esInfo = this.parse(['array', 'uint8', mapping.esInfoLength]);
                             data.mappings.push(mapping);
-                            
+
                             dataLength -= 5 + mapping.esInfoLength;
                         }
 
@@ -255,7 +254,7 @@ MPEGTS.readFrom = function(source, callback) {
                 this.response = new VBArray(this.responseBody).toArray().map(String.fromCharCode).join('');
             }
             callbackWrapper(this.response);
-        }
+        };
 
         xhr.send();
     }
