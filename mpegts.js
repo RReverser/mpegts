@@ -1,5 +1,5 @@
 function MPEGTS(data) {
-    this.parser = new jParser(new jDataView(data), MPEGTS.structure);
+    this.parser = new jBinary(new jDataView(data), MPEGTS.structure);
     this.pat = {};
     this.pmt = {};
 }
@@ -78,7 +78,10 @@ MPEGTS.structure = {
         _prefix1: ['expect', 'uint8', 0x00],
         _prefix2: ['expect', 'uint8', 0x01],
         streamId: 'uint8',
-        length: 'uint16',
+        _length: 'uint16',
+        length: function () {
+            return this.current._length || (188 - (this.tell() % 188));
+        },
         extension: ['if', function () { return !(this.current.streamId == 0xBE || this.current.streamId == 0xBF) }, function () {
             var extension = this.parse({
                 _prefix: ['expect', 2, 2],
@@ -211,8 +214,11 @@ MPEGTS.structure = {
                 if (this.current.header.payloadStart && this.current.header.pid in mpegts.pmt) {
                     return this.parse('PES');
                 }
+            }],
+
+            skip: function () {
                 return this.parse(['array', 'uint8', 188 - (this.tell() - this.current._startof)]);
-            }]
+            }
         });
     }
 };

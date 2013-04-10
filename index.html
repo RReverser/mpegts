@@ -3,7 +3,7 @@
 <head>
     <title>MPEG-TS Parser demo</title>
     <script src="/jDataView/src/jdataview.js"></script>
-    <script src="/jParser/src/jparser.js"></script>
+    <script src="/jBinary/src/jbinary.js"></script>
     <script src="mpegts.js"></script>
     <style type="text/css">
         #jsonContainer { color: #733; font-style: italic; word-wrap: break-word; }
@@ -14,15 +14,15 @@
     <pre id="jsonContainer">
     </pre>
     <script>
-        var mpegts = MPEGTS.readFrom('sample_mpeg4.ts', function () {
-            this.readPacket(1); // PAT
-            this.readPacket(2); // PMT
-            this.readPacket(3);
+        var mpegts = MPEGTS.readFrom('sample.ts', function () {
+            // PAT + PMT + ...
+            for (var i = 0; i < 3; i++) this.readPacket();
+
             document.getElementById('jsonContainer').innerHTML = // PES
                 JSON.stringify(
-                    this.readPacket(4),
+                    this.readPacket(),
                     function (key, value) {
-                        if (key[0] === '_') return undefined;
+                        // if (key[0] === '_') return undefined;
 
                         if (value instanceof Array && (typeof value[0] === 'number')) {
                             value = value.map(function (value) {
