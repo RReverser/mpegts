@@ -177,7 +177,34 @@ MP4.structure = {
         }
     },
 
-    minf: 'MultiBox'
+    minf: 'MultiBox',
+
+    vmhd: {
+        header: ['BoxHeader', 0],
+        graphicsmode: 'uint16',
+        opcolor: {
+            r: 'uint16',
+            g: 'uint16',
+            b: 'uint16'
+        }
+    },
+
+    smhd: {
+        header: ['BoxHeader', 0],
+        balance: ['FixedPoint', 'int16', 8],
+        _reserved: ['skip', 2]
+    },
+
+    hmhd: {
+        header: ['BoxHeader', 0],
+        maxPDUsize: 'uint16',
+        avgPDUsize: 'uint16',
+        maxbitrate: 'uint32',
+        avgbitrate: 'uint32',
+        _reserved: ['skip', 4]
+    },
+
+    stbl: 'MultiBox'
 };
 
 MP4.readFrom = function(source, callback) {
