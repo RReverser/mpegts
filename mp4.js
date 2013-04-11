@@ -1,12 +1,24 @@
 (function (exports) {
 var timeBasis = new Date(1970, 0, 1) - new Date(1904, 0, 1);
 
+function extend(obj) {
+    for (var i = 1; i < arguments.length; ++i) {
+        var source = arguments[i];
+        for (var prop in source) {
+            if (source[prop] !== undefined) {
+                obj[prop] = source[prop];
+            }
+        }
+    }
+    return obj;
+}
+
 function MP4(data) {
     this.parser = new jBinary(new jDataView(data), MP4.structure);
 }
 
 MP4.prototype.readBox = function () {
-    return this.parser.parse('Box');
+    return this.parser.parse('AnyBox');
 };
 
 MP4.structure = {
@@ -16,50 +28,44 @@ MP4.structure = {
         }
     },
 
+    extend: function (baseType, extension) {
+        var obj = this.parse(baseType);
+        var oldBase = this.base;
+        this.base = obj;
+        obj = extend(obj, this.parse(extension));
+        this.base = oldBase;
+        return obj;
+    },
+
     ShortName: ['string', 4],
 
     'uint64': function () {
         return this.parse('uint32') * Math.pow(2, 32) + this.parse('uint32');
     },
 
-    BoxHeader: function (flags) {
-        var header = this.parse({
-            _size: 'uint32',
-            type: 'ShortName',
-            size: function () {
-                switch (this.current._size) {
-                    case 0: return this.view.byteLength - this.tell() + 8;
-                    case 1: return this.parse('uint64');
-                    default: return this.current._size;
-                }
+    Box: {
+        _size: 'uint32',
+        type: 'ShortName',
+        size: function () {
+            switch (this.current._size) {
+                case 0: return this.view.byteLength - this.tell() + 8;
+                case 1: return this.parse('uint64');
+                default: return this.current._size;
             }
-        });
-        if (flags !== undefined) {
-            header.version = this.parse('uint8');
-            var afterFlags = this.tell() + 3;
-            if (flags instanceof Object) {
-                var oldCurrent = this.current;
-                this.current = header;
-                header.flags = this.parse(flags);
-                this.current = oldCurrent;
-            }
-            this.seek(afterFlags);
-            this._bitShift = 0;
         }
-        return header;
     },
 
-    Box: function () {
-        var header = this.seek(this.tell(), function () {
-            return this.parse('BoxHeader');
-        });
-        var afterBox = this.tell() + header.size;
+    FullBox: ['extend', 'Box', {
+        version: 'uint8',
+        flags: 24
+    }],
+
+    AnyBox: function () {
+        var header = this.seek(this.tell(), function () { return this.parse('Box') });
+        var endOf = this.tell() + header.size;
         var type = MP4.structure[header.type];
-
-        if (!type) console.log(header.type);
-
-        var box = type ? this.parse(type) : {header: header};
-        if (!type) this.seek(afterBox);
+        var box = type ? this.parse(type) : header;
+        this.seek(endOf);
         return box;
     },
 
@@ -74,16 +80,15 @@ MP4.structure = {
         return this.parse(baseType) / (1 << n);
     },
 
-    MultiBox: {
-        header: 'BoxHeader',
+    MultiBox: ['extend', 'Box', {
         atoms: function () {
-            var atoms = [], endOf = this.tell() + (this.current.header.size - 8);
+            var atoms = [], endOf = this.tell() + (this.base.size - 8);
             while (this.tell() < endOf) {
-                atoms.push(this.parse('Box'));
+                atoms.push(this.parse('AnyBox'));
             }
             return atoms;
         }
-    },
+    }],
 
     TransformationMatrix: {
         a: ['FixedPoint', 'uint32', 16],
@@ -99,42 +104,39 @@ MP4.structure = {
 
     Volume: ['FixedPoint', 'uint16', 8],
 
-    ftyp: {
-        header: 'BoxHeader',
+    TimestampBox: ['extend', 'FullBox', {
+        creation_time: function () { return this.parse('Time', this.base.version) },
+        modification_time: function () { return this.parse('Time', this.base.version) }
+    }],
+
+    DurationBox: ['extend', 'TimestampBox', {
+        timescale: 'uint32',
+        duration: function () { return this.parse(this.base.version ? 'uint64' : 'uint32') }
+    }],
+
+    ftyp: ['extend', 'Box', {
         major_brand: 'ShortName',
         minor_version: 'uint32',
-        compatible_brands: ['array', 'ShortName', function () { return (this.current.header.size - 16) / 4 }]
-    },
+        compatible_brands: ['array', 'ShortName', function () { return (this.base.size - 16) / 4 }]
+    }],
 
     moov: 'MultiBox',
 
-    mvhd: {
-        header: ['BoxHeader', 0],
-        creation_time: function () { return this.parse('Time', this.current.header.version) },
-        modification_time: function () { return this.parse('Time', this.current.header.version) },
-        timescale: 'uint32',
-        duration: function () { return this.parse(this.current.header.version ? 'uint64' : 'uint32') },
+    mvhd: ['extend', 'DurationBox', {
         rate: ['FixedPoint', 'uint32', 16],
         volume: 'Volume',
         _reserved: ['skip', 10],
         matrix: 'TransformationMatrix',
         _reserved2: ['skip', 24],
         next_track_ID: 'uint32'
-    },
+    }],
 
     trak: 'MultiBox',
 
-    tkhd: {
-        header: ['BoxHeader', {
-            track_enabled: 1,
-            track_in_movie: 1,
-            track_in_preview: 1
-        }],
-        creation_time: function () { return this.parse('Time', this.current.header.version) },
-        modification_time: function () { return this.parse('Time', this.current.header.version) },
+    tkhd: ['extend', 'TimestampBox', {
         track_ID: 'uint32',
         _reserved: ['skip', 4],
-        duration: function () { return this.parse(this.current.header.version ? 'uint64' : 'uint32') },
+        duration: function () { return this.parse(this.base.version ? 'uint64' : 'uint32') },
         _reserved2: ['skip', 8],
         layer: 'int16',
         alternate_group: 'uint16',
@@ -143,16 +145,11 @@ MP4.structure = {
         matrix: 'TransformationMatrix',
         width: ['FixedPoint', 'uint32', 16],
         height: ['FixedPoint', 'uint32', 16]
-    },
+    }],
 
     mdia: 'MultiBox',
 
-    mdhd: {
-        header: ['BoxHeader', 0],
-        creation_time: function () { return this.parse('Time', this.current.header.version) },
-        modification_time: function () { return this.parse('Time', this.current.header.version) },
-        timescale: 'uint32',
-        duration: function () { return this.parse(this.current.header.version ? 'uint64' : 'uint32') },
+    mdhd: ['extend', 'DurationBox', {
         _padding: 1,
         lang: function () {
             return String.fromCharCode.apply(
@@ -161,10 +158,9 @@ MP4.structure = {
             );
         },
         _reserved: ['skip', 2]
-    },
+    }],
 
-    hdlr: {
-        header: ['BoxHeader', 0],
+    hdlr: ['extend', 'FullBox', {
         _reserved: ['skip', 4],
         handler_type: ['string', 4],
         _reserved2: ['skip', 12],
@@ -175,34 +171,31 @@ MP4.structure = {
             }
             return String.fromCharCode.apply(String, bytes);
         }
-    },
+    }],
 
     minf: 'MultiBox',
 
-    vmhd: {
-        header: ['BoxHeader', 0],
+    vmhd: ['extend', 'FullBox', {
         graphicsmode: 'uint16',
         opcolor: {
             r: 'uint16',
             g: 'uint16',
             b: 'uint16'
         }
-    },
+    }],
 
-    smhd: {
-        header: ['BoxHeader', 0],
+    smhd: ['extend', 'FullBox', {
         balance: ['FixedPoint', 'int16', 8],
         _reserved: ['skip', 2]
-    },
+    }],
 
-    hmhd: {
-        header: ['BoxHeader', 0],
+    hmhd: ['extend', 'FullBox', {
         maxPDUsize: 'uint16',
         avgPDUsize: 'uint16',
         maxbitrate: 'uint32',
         avgbitrate: 'uint32',
         _reserved: ['skip', 4]
-    },
+    }],
 
     stbl: 'MultiBox'
 };
