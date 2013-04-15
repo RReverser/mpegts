@@ -13,6 +13,7 @@
 <body>
     <pre id="jsonContainer">
     </pre>
+    <video id="video"></video>
     <script>
         var mpegts = MP4.readFrom('sample.mp4', function () {
             document.getElementById('jsonContainer').innerHTML = // PES
@@ -32,6 +33,11 @@
                     },
                     '    '
                 );
+
+            var source = document.createElement('source');
+            source.type = 'video/mp4';
+            source.src = this.parser.toURL(source.type);
+            document.getElementById('video').appendChild(source);
         });
     </script>
 </body>

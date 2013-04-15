@@ -1,20 +1,8 @@
 (function (exports) {
 var timeBasis = new Date(1970, 0, 1) - new Date(1904, 0, 1);
 
-function extend(obj) {
-    for (var i = 1; i < arguments.length; ++i) {
-        var source = arguments[i];
-        for (var prop in source) {
-            if (source[prop] !== undefined) {
-                obj[prop] = source[prop];
-            }
-        }
-    }
-    return obj;
-}
-
 function MP4(data) {
-    this.parser = new jBinary(new jDataView(data), MP4.structure);
+    this.parser = new jBinary(data, MP4.structure);
 }
 
 MP4.prototype.readBox = function () {
@@ -22,24 +10,9 @@ MP4.prototype.readBox = function () {
 };
 
 MP4.structure = {
-    expect: function (type, value, errorMsg) {
-        if (this.parse(type) != value) {
-            throw new TypeError(errorMsg);
-        }
-    },
-
-    extend: function (baseType, extension) {
-        var obj = this.parse(baseType);
-        var oldBase = this.base;
-        this.base = obj;
-        obj = extend(obj, this.parse(extension));
-        this.base = oldBase;
-        return obj;
-    },
-
     ShortName: ['string', 4],
 
-    'uint64': function () {
+    uint64: function () {
         return this.parse('uint32') * Math.pow(2, 32) + this.parse('uint32');
     },
 
@@ -164,13 +137,7 @@ MP4.structure = {
         _reserved: ['skip', 4],
         handler_type: ['string', 4],
         _reserved2: ['skip', 12],
-        name: function () {
-            var bytes = [], nextByte;
-            while (nextByte = this.parse('uint8')) {
-                bytes.push(nextByte);
-            }
-            return String.fromCharCode.apply(String, bytes);
-        }
+        name: 'string'
     }],
 
     minf: 'MultiBox',
@@ -197,7 +164,25 @@ MP4.structure = {
         _reserved: ['skip', 4]
     }],
 
-    stbl: 'MultiBox'
+    stbl: 'MultiBox',
+
+    SampleEntry: ['extend', 'Box', {
+        _reserved: ['skip', 6],
+        data_reference_index: 'uint16'
+    }],
+
+    btrt: ['extend', 'Box', {
+        bufferSizeDB: 'uint32',
+        maxBitrate: 'uint32',
+        avgBitrate: 'uint32'
+    }],
+
+    metx: ['extend', 'SampleEntry', {
+        content_encoding: 'string',
+        namespace: 'string',
+        schema_location: 'string',
+        bitratebox: 'btrt'
+    }]
 };
 
 MP4.readFrom = function(source, callback) {
@@ -241,7 +226,7 @@ MP4.readFrom = function(source, callback) {
 
         xhr.send();
     }
-}
+};
 
 exports.MP4 = MP4;
 })(this);
