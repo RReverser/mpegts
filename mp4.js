@@ -16,15 +16,25 @@ MP4.structure = {
         return this.parse('uint32') * Math.pow(2, 32) + this.parse('uint32');
     },
 
+    Dimensions: function (type) {
+        return this.parse({
+            horz: type,
+            vert: type
+        });
+    },
+
     Box: {
         _size: 'uint32',
         type: 'ShortName',
         size: function () {
-            switch (this.current._size) {
+            switch (this.context.getCurrent()._size) {
                 case 0: return this.view.byteLength - this.tell() + 8;
                 case 1: return this.parse('uint64');
-                default: return this.current._size;
+                default: return this.context.getCurrent()._size;
             }
+        },
+        _endOf: function () {
+            return this.tell() + (this.context.getCurrent().size - 8);
         }
     },
 
@@ -37,6 +47,7 @@ MP4.structure = {
         var header = this.seek(this.tell(), function () { return this.parse('Box') });
         var endOf = this.tell() + header.size;
         var type = MP4.structure[header.type];
+        if (!type) console.log(header.type);
         var box = type ? this.parse(type) : header;
         this.seek(endOf);
         return box;
@@ -55,7 +66,7 @@ MP4.structure = {
 
     MultiBox: ['extend', 'Box', {
         atoms: function () {
-            var atoms = [], endOf = this.tell() + (this.base.size - 8);
+            var atoms = [], endOf = this.context.getParent()._endOf;
             while (this.tell() < endOf) {
                 atoms.push(this.parse('AnyBox'));
             }
@@ -78,20 +89,24 @@ MP4.structure = {
     Volume: ['FixedPoint', 'uint16', 8],
 
     TimestampBox: ['extend', 'FullBox', {
-        creation_time: function () { return this.parse('Time', this.base.version) },
-        modification_time: function () { return this.parse('Time', this.base.version) }
+        creation_time: function () { return this.parse('Time', this.context.getParent().version) },
+        modification_time: function () { return this.parse('Time', this.context.getParent().version) }
     }],
 
     DurationBox: ['extend', 'TimestampBox', {
         timescale: 'uint32',
-        duration: function () { return this.parse(this.base.version ? 'uint64' : 'uint32') }
+        duration: function () { return this.parse(this.context.getParent().version ? 'uint64' : 'uint32') }
     }],
 
     ftyp: ['extend', 'Box', {
         major_brand: 'ShortName',
         minor_version: 'uint32',
-        compatible_brands: ['array', 'ShortName', function () { return (this.base.size - 16) / 4 }]
+        compatible_brands: ['array', 'ShortName', function () { return (this.context.getParent().size - 16) / 4 }]
     }],
+
+    free: 'Box',
+
+    mdat: 'Box',
 
     moov: 'MultiBox',
 
@@ -109,15 +124,14 @@ MP4.structure = {
     tkhd: ['extend', 'TimestampBox', {
         track_ID: 'uint32',
         _reserved: ['skip', 4],
-        duration: function () { return this.parse(this.base.version ? 'uint64' : 'uint32') },
+        duration: function () { return this.parse(this.context.getParent().version ? 'uint64' : 'uint32') },
         _reserved2: ['skip', 8],
         layer: 'int16',
         alternate_group: 'uint16',
         volume: 'Volume',
         _reserved3: ['skip', 2],
         matrix: 'TransformationMatrix',
-        width: ['FixedPoint', 'uint32', 16],
-        height: ['FixedPoint', 'uint32', 16]
+        size: ['Dimensions', ['FixedPoint', 'uint32', 16]]
     }],
 
     mdia: 'MultiBox',
@@ -135,7 +149,11 @@ MP4.structure = {
 
     hdlr: ['extend', 'FullBox', {
         _reserved: ['skip', 4],
-        handler_type: ['string', 4],
+        handler_type: function () {
+            var handler_type = this.parse('string', 4);
+            this.context.findParent(function (atom) { return atom.type === 'trak' })._handler_type = handler_type;
+            return handler_type;
+        },
         _reserved2: ['skip', 12],
         name: 'string'
     }],
@@ -182,6 +200,72 @@ MP4.structure = {
         namespace: 'string',
         schema_location: 'string',
         bitratebox: 'btrt'
+    }],
+
+    mett: ['extend', 'SampleEntry', {
+        content_encoding: 'string',
+        mime_format: 'string',
+        bitratebox: 'btrt'
+    }],
+
+    pasp: ['extend', 'Box', {
+        spacing: ['Dimensions', 'uint32']
+    }],
+
+    ClapInnerFormat: ['Dimensions', {
+        N: 'uint32',
+        D: 'uint32'
+    }],
+
+    clap: ['extend', 'Box', {
+        cleanAperture: 'ClapInnerFormat',
+        off: 'ClapInnerFormat'
+    }],
+
+    VisualSampleEntry: ['extend', 'SampleEntry', {
+        _reserved: ['skip', 16],
+        size: ['Dimensions', 'uint16'],
+        resolution: ['Dimensions', ['FixedPoint', 'uint32', 16]],
+        _reserved2: ['skip', 4],
+        frame_count: 'uint16',
+        compressorname: function () {
+            var length = this.parse('uint8');
+            var name = this.parse('string', length);
+            this.skip(32 - 1 - length);
+            return name;
+        },
+        depth: 'uint16',
+        _reserved3: ['skip', 2]
+    }, function () {
+        var endOf = this.context.getParent()._endOf, extension;
+        if (this.tell() < endOf) {
+            extension = {};
+            extension.cleanaperture = this.parse('clap');
+            if (this.tell() < endOf) {
+                extension.pixelaspectratio = this.parse('pasp');
+            }
+        }
+        return extension;
+    }],
+
+    AudioSampleEntry: ['extend', 'SampleEntry', {
+        _reserved: ['skip', 8],
+        channelcount: 'uint16',
+        samplesize: 'uint16',
+        _reserved2: ['skip', 2],
+        samplerate: 'uint32'
+    }],
+
+    stsd: ['extend', 'FullBox', {
+        _entry_count: 'uint32',
+        entries: function () {
+            var sampleEntryType = {
+                soun: 'AudioSampleEntry',
+                vide: 'VisualSampleEntry',
+                meta: 'AnyBox'
+            }[this.context.findParent(function (atom) { return atom.type === 'trak' })._handler_type] || 'SampleEntry';
+            return this.parse('array', sampleEntryType, function () { return this.context.getCurrent()._entry_count });
+        }
     }]
 };
 
