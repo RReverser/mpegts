@@ -22,7 +22,7 @@
                     function (key, value) {
                         if (key[0] === '_') return undefined;
 
-                        if (value instanceof Array && (typeof value[0] === 'number')) {
+                        if (value instanceof Array && value.length > 10 && (typeof value[0] === 'number')) {
                             value = value.map(function (value) {
                                 var str = value.toString(16).toUpperCase();
                                 return str.length == 2 ? str : '0' + str;

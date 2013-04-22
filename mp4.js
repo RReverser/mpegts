@@ -3,6 +3,9 @@ var timeBasis = new Date(1970, 0, 1) - new Date(1904, 0, 1);
 
 function MP4(data) {
     this.parser = new jBinary(data, MP4.structure);
+    this.parser.findParentAtom = function (type) {
+        return this.context.findParent(function (atom) { return atom.type === type });
+    };
 }
 
 MP4.prototype.readBox = function () {
@@ -151,7 +154,7 @@ MP4.structure = {
         _reserved: ['skip', 4],
         handler_type: function () {
             var handler_type = this.parse('string', 4);
-            this.context.findParent(function (atom) { return atom.type === 'trak' })._handler_type = handler_type;
+            this.findParentAtom('trak')._handler_type = handler_type;
             return handler_type;
         },
         _reserved2: ['skip', 12],
@@ -256,17 +259,62 @@ MP4.structure = {
         samplerate: 'uint32'
     }],
 
-    stsd: ['extend', 'FullBox', {
-        _entry_count: 'uint32',
-        entries: function () {
-            var sampleEntryType = {
-                soun: 'AudioSampleEntry',
-                vide: 'VisualSampleEntry',
-                meta: 'AnyBox'
-            }[this.context.findParent(function (atom) { return atom.type === 'trak' })._handler_type] || 'SampleEntry';
-            return this.parse('array', sampleEntryType, function () { return this.context.getCurrent()._entry_count });
-        }
-    }]
+    ArrayBox: function (type) {
+        return this.parse('extend', 'FullBox', {
+            entry_count: 'uint32',
+            entries: ['array', type, function () { return this.context.getCurrent().entry_count }]
+        });
+    },
+
+    stsd: function () {
+        return this.parse(
+            'ArrayBox',
+            {soun: 'AudioSampleEntry', vide: 'VisualSampleEntry', meta: 'AnyBox'}[this.findParentAtom('trak')._handler_type] || 'SampleEntry'
+        );
+    },
+
+    stdp: ['extend', 'FullBox', {
+        priorities: ['array', 'uint16', function () {
+            return this.findParentAtom('stbl')._sample_count;
+        }]
+    }],
+
+    stsl: ['extend', 'FullBox', {
+        _reserved: 7,
+        constraint_flag: 1,
+        scale_method: ['enum', 'uint8', [false, 'fill', 'hidden', 'meet', 'slice-x', 'slice-y']],
+        display_center: ['Dimensions', 'int16']
+    }],
+
+    stts: ['ArrayBox', {
+        sample_count: 'uint32',
+        sample_delta: 'uint32'
+    }],
+
+    ctts: ['ArrayBox', {
+            sample_count: 'uint32',
+            sample_offset: 'uint32'
+    }],
+
+    stss: ['ArrayBox', 'uint32'],
+
+    stsh: ['ArrayBox', {
+        shadowed_sample_number: 'uint32',
+        sync_sample_number: 'uint32'
+    }],
+
+    ExtendedBoolean: ['enum', [undefined, true, false]],
+
+    sdtp: ['extend', 'FullBox', {
+        dependencies: ['array', {
+            _reserved: 2,
+            sample_depends_on: 'ExtendedBoolean',
+            sample_is_depended_on: 'ExtendedBoolean',
+            sample_has_redundancy: 'ExtendedBoolean'
+        }, function () { return this.findParentAtom('stbl')._sample_count }]
+    }],
+
+    edts: 'MultiBox'
 };
 
 MP4.readFrom = function(source, callback) {
