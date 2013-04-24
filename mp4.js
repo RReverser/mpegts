@@ -19,6 +19,8 @@ MP4.structure = {
         return this.parse('uint32') * Math.pow(2, 32) + this.parse('uint32');
     },
 
+    int64: 'uint64',
+
     Dimensions: function (type) {
         return this.parse({
             horz: type,
@@ -104,7 +106,7 @@ MP4.structure = {
     ftyp: ['extend', 'Box', {
         major_brand: 'ShortName',
         minor_version: 'uint32',
-        compatible_brands: ['array', 'ShortName', function () { return (this.context.getParent().size - 16) / 4 }]
+        compatible_brands: ['array', 'ShortName', function () { return (this.context.getParent()._endOf - this.tell()) / 4 }]
     }],
 
     free: 'Box',
@@ -136,6 +138,18 @@ MP4.structure = {
         matrix: 'TransformationMatrix',
         size: ['Dimensions', ['FixedPoint', 'uint32', 16]]
     }],
+
+    tref: 'MultiBox',
+
+    TrackReferenceTypeBox: ['extend', 'Box', {
+        track_IDs: ['array', 'uint32', function () { return (this.context.getParent()._endOf - this.tell()) / 4 }]
+    }],
+
+    hint: 'TrackReferenceTypeBox',
+
+    cdsc: 'TrackReferenceTypeBox',
+
+    hind: 'TrackReferenceTypeBox',
 
     mdia: 'MultiBox',
 
@@ -281,7 +295,7 @@ MP4.structure = {
 
     stsl: ['extend', 'FullBox', {
         _reserved: 7,
-        constraint_flag: 1,
+        constraint_flag: 'bool',
         scale_method: ['enum', 'uint8', [false, 'fill', 'hidden', 'meet', 'slice-x', 'slice-y']],
         display_center: ['Dimensions', 'int16']
     }],
@@ -314,7 +328,57 @@ MP4.structure = {
         }, function () { return this.findParentAtom('stbl')._sample_count }]
     }],
 
-    edts: 'MultiBox'
+    edts: 'MultiBox',
+
+    elst: ['ArrayBox', {
+        segment_duration: function () { return this.parse(this.context[2].version ? 'uint64' : 'uint32') },
+        media_time: function () { return this.parse(this.context[2].version ? 'int64' : 'int32') },
+        media_rate: ['FixedPoint', 'uint32', 16]
+    }],
+
+    dinf: 'MultiBox',
+
+    'url ': ['extend', 'FullBox', {
+        location: 'string'
+    }],
+
+    'urn ': ['extend', 'FullBox', {
+        name: 'string',
+        location: 'string'
+    }],
+
+    dref: ['ArrayBox', 'AnyBox'],
+
+    stsz: ['extend', 'FullBox', {
+        sample_size: 'uint32',
+        sample_count: 'uint32',
+        _sample_count_to_stbl: function () {
+            this.findParentAtom('stbl')._sample_count = this.context.getCurrent().sample_count;
+        },
+        sample_sizes: ['if', function () { return !this.context.getCurrent().sample_size }, 'array', 'uint32', function () { return this.context.getCurrent().sample_count }]
+    }],
+
+    stz2: ['extend', 'FullBox', {
+        _reserved: ['skip', 3],
+        field_size: 'uint8',
+        sample_count: 'uint32',
+        _sample_count_to_stbl: function () {
+            this.findParentAtom('stbl')._sample_count = this.context.getCurrent().sample_count;
+        },
+        sample_sizes: function () {
+            return this.parse('array', this.context.getCurrent().field_size, this.context.getCurrent().sample_count);
+        }
+    }],
+
+    stsc: ['ArrayBox', {
+        first_chunk: 'uint32',
+        samples_per_chunk: 'uint32',
+        sample_description_index: 'uint32'
+    }],
+
+    stco: ['ArrayBox', 'uint32'],
+
+    co64: ['ArrayBox', 'uint64']
 };
 
 MP4.readFrom = function(source, callback) {
