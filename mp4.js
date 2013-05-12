@@ -384,7 +384,32 @@ MP4.structure = {
 
     stco: ['ArrayBox', 'uint32'],
 
-    co64: ['ArrayBox', 'uint64']
+    co64: ['ArrayBox', 'uint64'],
+
+    padb: ['extend', 'FullBox', {
+        sample_count: 'uint32',
+        samples: ['array', {
+            _reserved: 1,
+            pad: 3
+        }, function () { return this.context.getCurrent().sample_count }]
+    }],
+
+    subs: ['ArrayBox', {
+        sample_delta: 'uint32',
+        subsample_count: 'uint16',
+        subsamples: ['array', {
+            subsample_size: function () { return this.parse(this.context.findParent(function (context) { return 'version' in context }).version ? 'uint32' : 'uint16') },
+            subsample_priority: 'uint8',
+            discardable: 'uint8',
+            _reserved: 'uint32'
+        }, function () { return this.context.getCurrent().subsample_count }]
+    }],
+
+    mvex: 'MultiBox',
+
+    mehd: ['extend', 'FullBox', {
+        fragment_duration: function () { return this.context.getParent().version ? 'uint64' : 'uint32' }
+    }]
 };
 
 MP4.readFrom = function(source, callback) {
