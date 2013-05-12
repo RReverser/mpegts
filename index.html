@@ -4,7 +4,7 @@
     <title>MPEG-TS Parser demo</title>
     <script src="/jDataView/src/jdataview.js"></script>
     <script src="/jBinary/src/jbinary.js"></script>
-    <script src="mp4.js"></script>
+    <script src="mpegts.js"></script>
     <style type="text/css">
         #jsonContainer { color: #733; font-style: italic; word-wrap: break-word; }
         .jsonValue { color: #373; font-weight: bold; font-style: normal; }
@@ -15,14 +15,14 @@
     </pre>
     <video id="video"></video>
     <script>
-        var mpegts = MP4.readFrom('sample.mp4', function () {
+        var mpegts = MPEGTS.readFrom('sample.ts', function () {
             document.getElementById('jsonContainer').innerHTML = // PES
                 JSON.stringify(
-                    this.parse(),
+                    [1,2,3,4,5].map(this.readPacket.bind(this)),
                     function (key, value) {
                         if (key[0] === '_') return undefined;
 
-                        if (value instanceof Array && value.length > 250 && (typeof value[0] === 'number')) {
+                        if (value instanceof Array && value.length > 100 && (typeof value[0] === 'number')) {
                             value = value.map(function (value) {
                                 var str = value.toString(16).toUpperCase();
                                 return str.length == 2 ? str : '0' + str;
@@ -34,10 +34,12 @@
                     '    '
                 );
 
+            /*
             var source = document.createElement('source');
             source.type = 'video/mp4';
             source.src = this.parser.toURL(source.type);
             document.getElementById('video').appendChild(source);
+            */
         });
     </script>
 </body>

@@ -31,7 +31,7 @@ MPEGTS.structure = {
 
     Field: {
         length: 'uint8',
-        data: ['array', 'uint8', function () { return this.current.length }]
+        data: ['array', 'uint8', function () { return this.context.getCurrent().length }]
     },
 
     TSAdaptationHeader: {
@@ -80,9 +80,9 @@ MPEGTS.structure = {
         streamId: 'uint8',
         _length: 'uint16',
         length: function () {
-            return this.current._length || (188 - (this.tell() % 188));
+            return this.context.getCurrent()._length || (188 - (this.tell() % 188));
         },
-        extension: ['if', function () { return !(this.current.streamId == 0xBE || this.current.streamId == 0xBF) }, function () {
+        extension: ['if', function () { return !(this.context.getCurrent().streamId == 0xBE || this.context.getCurrent().streamId == 0xBF) }, function () {
             var extension = this.parse({
                 _prefix: ['expect', 2, 2],
                 scramblingControl: 2,
@@ -102,7 +102,7 @@ MPEGTS.structure = {
             this.skip(extension.length);
             return extension;
         }],
-        elementaryStream: ['array', 'uint8', function () { return this.current.length - this.current.extension.length - 3 }]
+        elementaryStream: ['array', 'uint8', function () { return this.context.getCurrent().length - this.context.getCurrent().extension.length - 3 }]
     },
 
     TSPrivateSection: function (mpegts, tsHeader) {
@@ -115,8 +115,8 @@ MPEGTS.structure = {
             sectionLength: 12,
 
             data: function () {
-                if (!this.current.isLongSection) {
-                    return this.parse(['array', 'uint8', this.current.sectionLength]);
+                if (!this.context.getCurrent().isLongSection) {
+                    return this.parse(['array', 'uint8', this.context.getCurrent().sectionLength]);
                 }
 
                 var header = this.parse({
@@ -128,9 +128,9 @@ MPEGTS.structure = {
                     lastSectionNumber: 'uint8'
                 });
 
-                var dataLength = this.current.sectionLength - 9, data;
+                var dataLength = this.context.getCurrent().sectionLength - 9, data;
 
-                switch (this.current.tableId) {
+                switch (this.context.getCurrent().tableId) {
                     case 0:
                         data = this.parse(['array', {
                             programNumber: 'uint16',
@@ -205,20 +205,18 @@ MPEGTS.structure = {
         return this.parse({
             _startof: function () { return this.tell() },
             header: 'TSHeader',
-            adaptationField: ['if', function () { return this.current.header.hasAdaptationField }, 'TSAdaptationField'],
+            adaptationField: ['if', function () { return this.context.getCurrent().header.hasAdaptationField }, 'TSAdaptationField'],
 
-            payload: ['if', function () { return this.current.header.hasPayload }, function () {
-                if (this.current.header.pid < 2 || this.current.header.pid in mpegts.pat) {
-                    return this.parse(['TSPrivateSection', mpegts, this.current.header]);
+            payload: ['if', function () { return this.context.getCurrent().header.hasPayload }, function () {
+                if (this.context.getCurrent().header.pid < 2 || this.context.getCurrent().header.pid in mpegts.pat) {
+                    return this.parse(['TSPrivateSection', mpegts, this.context.getCurrent().header]);
                 }
-                if (this.current.header.payloadStart && this.current.header.pid in mpegts.pmt) {
+                if (this.context.getCurrent().header.payloadStart && this.context.getCurrent().header.pid in mpegts.pmt) {
                     return this.parse('PES');
                 }
             }],
 
-            skip: function () {
-                return this.parse(['array', 'uint8', 188 - (this.tell() - this.current._startof)]);
-            }
+            raw: ['array', 'uint8', function () { return 188 - (this.tell() - this.context.getCurrent()._startof) }]
         });
     }
 };
