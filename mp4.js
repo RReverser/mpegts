@@ -8,8 +8,13 @@ function MP4(data) {
     };
 }
 
-MP4.prototype.readBox = function () {
-    return this.parser.parse('AnyBox');
+MP4.prototype.parse = function () {
+	var atoms = {}, endOf = this.parser.view.byteLength;
+	while (this.parser.tell() < endOf) {
+		var item = this.parser.parse('AnyBox');
+		(atoms[item.type] || (atoms[item.type] = [])).push(item);
+	}
+	return atoms;
 };
 
 MP4.structure = {
@@ -71,9 +76,10 @@ MP4.structure = {
 
     MultiBox: ['extend', 'Box', {
         atoms: function () {
-            var atoms = [], endOf = this.context.getParent()._endOf;
+            var atoms = {}, endOf = this.context.getParent()._endOf;
             while (this.tell() < endOf) {
-                atoms.push(this.parse('AnyBox'));
+	            var item = this.parse('AnyBox');
+	            (atoms[item.type] || (atoms[item.type] = [])).push(item);
             }
             return atoms;
         }
