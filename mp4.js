@@ -8,7 +8,7 @@ function toValue(prop, val) {
 var MP4 = jBinary.FileFormat({
 	ShortName: ['string', 4],
 	
-	Rate: ['FixedPoint', 'uint32', 16],
+	Rate: ['FixedPoint', 'int32', 16],
 
 	Dimensions: jBinary.Template(
 		function (itemType) {
@@ -145,8 +145,8 @@ var MP4 = jBinary.FileFormat({
 
 	FBVersionable: jBinary.Template(
 		['type0', 'type1'],
-		function (type0, type1) {
-			return this.binary.getContext('version').version ? type1 : type0;
+		function () {
+			return this.binary.getContext('version').version ? this.type1 : this.type0;
 		}
 	),
 

@@ -14,7 +14,7 @@
 	<pre id="jsonContainer">
 	</pre>
 	<video id="video"></video>
-	<a id="url"></a>
+	<a id="url">Download</a>
 	<script>
 		if (!('time' in console)) {
 			var timeStarts = {};
@@ -61,7 +61,7 @@
 			source.src = this.binary.toURL(source.type);
 			document.getElementById('video').appendChild(source);
 
-			document.getElementById('url').href = document.getElementById('url').innerHTML = source.src;
+			document.getElementById('url').href = source.src;
 		});
 	</script>
 </body>
