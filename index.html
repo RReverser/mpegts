@@ -42,9 +42,9 @@
 				JSON.stringify(
 					data,
 					function (key, value) {
-						if (key[0] === '_') return undefined;
+						if (key[0] === '_') return;
 
-						if (value instanceof Array && value.length > 10 && value.every(function (item) { return (item >= 0 && item <= 255) })) {
+						if (value instanceof Array && value.length > 4 && value.every(function (item) { return (item >= 0 && item <= 255) })) {
 							value = value.map(function (value) {
 								var str = value.toString(16).toUpperCase();
 								return str.length == 2 ? str : '0' + str;

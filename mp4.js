@@ -183,7 +183,33 @@ var MP4 = jBinary.FileFormat({
 
 	mdat: ['extend', 'BoxHeader', 'RawData'],
 
-	avcC: ['extend', 'BoxHeader', 'RawData'],
+	ParamSets: jBinary.Template(
+		function (numType) {
+			this.baseType = ['DynamicArray', numType, jBinary.Property(
+				null,
+				function () {
+					var length = this.binary.read('uint16');
+					return this.binary.read(['blob', length]);
+				},
+				function (paramSet) {
+					this.binary.write('uint16', paramSet.length);
+					this.binary.write(['blob', paramSet.length], paramSet);
+				}
+			)];
+		}
+	),
+
+	avcC: ['extend', 'BoxHeader', {
+		version: ['const', 'uint8', 1],
+		profileIndication: 'uint8',
+		profileCompatibility: 'uint8',
+		levelIndication: 'uint8',
+		_reserved: ['const', 6, -1],
+		lengthSizeMinusOne: 2,
+		_reserved2: ['const', 3, -1],
+		seqParamSets: ['ParamSets', 5],
+		pictParamSets: ['ParamSets', 'uint8']
+	}],
 
 	moov: 'MultiBox',
 
@@ -381,19 +407,22 @@ var MP4 = jBinary.FileFormat({
 		samplerate: 'Rate'
 	}, 'RawData'],
 
+	DynamicArray: jBinary.Property(
+		['lengthType', 'itemType'],
+		function () {
+			var length = this.binary.read(this.lengthType);
+			return this.binary.read(['array', this.itemType, length]);
+		},
+		function (array) {
+			this.binary.write(this.lengthType, array.length);
+			this.binary.write(['array', this.itemType, array.length], array);
+		}
+	),
+
 	ArrayBox: jBinary.Template(
 		function (entryType) {
 			this.baseType = ['extend', 'FullBox', {
-				entry_count: jBinary.Property(
-					null,
-					function () {
-						return this.binary.read('uint32');
-					},
-					function () {
-						this.binary.write('uint32', this.binary.getContext().entries.length)
-					}
-				),
-				entries: ['array', entryType, function () { return this.binary.getContext().entry_count }]
+				entries: ['DynamicArray', 'uint32', entryType]
 			}];
 		}
 	),
@@ -484,15 +513,11 @@ var MP4 = jBinary.FileFormat({
 		_sample_count_to_stbl: function () {
 			this.binary.getContext(atomFilter('stbl'))._sample_count = this.binary.getContext().sample_count;
 		},
-		sample_sizes: ['array', jBinary.Property(
-			null,
-			function () {
-				return this.binary.read(this.binary.getContext().field_size);
-			},
-			function (value) {
-				this.binary.write(this.binary.getContext().field_size, value)
-			}
-		), function () { return this.binary.getContext().sample_count }]
+		sample_sizes: [
+			'array',
+			jBinary.Template(null, function () { return this.binary.getContext().field_size }),
+			function () { return this.binary.getContext().sample_count }
+		]
 	}],
 
 	stsc: ['ArrayBox', {
@@ -506,22 +531,27 @@ var MP4 = jBinary.FileFormat({
 	co64: ['ArrayBox', 'uint64'],
 
 	padb: ['extend', 'FullBox', {
-		sample_count: 'uint32',
-		samples: ['array', {
-			_reserved: 1,
-			pad: 3
-		}, function () { return this.binary.getContext().sample_count }]
+		pads: ['DynamicArray', 'uint32', jBinary.Property(
+			null,
+			function () {
+				this.binary.read(1);
+				return this.binary.read(3);
+			},
+			function (pad) {
+				this.binary.write(1, 0);
+				this.binary.write(3, pad);
+			}
+		)]
 	}],
 
 	subs: ['ArrayBox', {
 		sample_delta: 'uint32',
-		subsample_count: 'uint16',
-		subsamples: ['array', {
+		subsamples: ['DynamicArray', 'uint16', {
 			subsample_size: ['FBVersionable', 'uint16', 'uint32'],
 			subsample_priority: 'uint8',
 			discardable: 'uint8',
 			_reserved: ['skip', 4]
-		}, function () { return this.binary.getContext().subsample_count }]
+		}]
 	}],
 
 	mvex: 'MultiBox',
