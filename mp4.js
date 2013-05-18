@@ -193,7 +193,7 @@ var MP4 = jBinary.FileFormat({
 				},
 				function (paramSet) {
 					this.binary.write('uint16', paramSet.length);
-					this.binary.write(['blob', paramSet.length], paramSet);
+					this.binary.write('blob', paramSet);
 				}
 			)];
 		}
@@ -415,7 +415,7 @@ var MP4 = jBinary.FileFormat({
 		},
 		function (array) {
 			this.binary.write(this.lengthType, array.length);
-			this.binary.write(['array', this.itemType, array.length], array);
+			this.binary.write(['array', this.itemType], array);
 		}
 	),
 
