@@ -35,7 +35,7 @@
 			var newVideo = new MP4(this.binary.view.byteLength);
 			console.time('write');
 			newVideo.write(data);
-			var url = newVideo.binary.toURL();
+			var url = newVideo.binary.toURL('video/mp4');
 			console.timeEnd('write');
 
 			document.getElementById('jsonContainer').innerHTML =
@@ -58,7 +58,7 @@
 
 			var source = document.createElement('source');
 			source.type = 'video/mp4';
-			source.src = this.binary.toURL(source.type);
+			source.src = url;
 			document.getElementById('video').appendChild(source);
 
 			document.getElementById('url').href = source.src;

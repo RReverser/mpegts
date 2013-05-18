@@ -19,20 +19,20 @@ var MP4 = jBinary.FileFormat({
 		}
 	),
 
-	Box: {
+	BoxHeader: {
 		_begin: function () {
-			return this.tell();
+			return this.binary.tell();
 		},
 		_size: jBinary.Property(
 			null,
 			function () {
 				return this.binary.read('uint32');
 			},
-			function (value) {
-				if (value === 0) {
+			function () {
+				var size = this.binary.getContext().size;
+				if (!size) {
 					return this.binary.write('uint32', 0);
 				}
-				var size = this.binary.getContext().size;
 				this.binary.write('uint32', size < Math.pow(2, 32) ? size : 1);
 			}
 		),
@@ -53,31 +53,37 @@ var MP4 = jBinary.FileFormat({
 				}
 			}
 		),
-		_end: function (context) {
-			return context._begin + context.size;
-		}
+		_end: jBinary.Property(
+			null,
+			function () {
+				var context = this.binary.getContext();
+				return context._begin + context.size;
+			}
+		)
 	},
 
-	FullBox: ['extend', 'Box', {
+	FullBox: ['extend', 'BoxHeader', {
 		version: 'uint8',
 		flags: 24
 	}],
 
-	AnyBox: jBinary.Property(
+	Box: jBinary.Property(
 		null,
 		function () {
 			var header = this.binary.skip(0, function () {
-				return this.read('Box');
+				return this.read('BoxHeader');
 			});
-			var type = this.binary.structure[header.type];
-			if (!type) console.log(header.type);
-			var box = type ? this.binary.read(type) : header;
+			var box = header.type in this.binary.structure ? this.binary.read(header.type) : header;
+			if (box === header) console.log(header.type);
 			this.binary.seek(header._end);
 			return box;
 		},
 		function (box) {
-			this.binary.write(this.binary.structure[box.type] || 'Box', box);
-			this.binary.seek(box._end);
+			this.binary.write(box.type in this.binary.structure ? box.type : 'BoxHeader', box);
+			var size = this.binary.tell() - box._begin;
+			this.binary.seek(box._begin, function () {
+				this.write('uint32', size);
+			});
 		}
 	),
 
@@ -103,7 +109,7 @@ var MP4 = jBinary.FileFormat({
 			return this.binary.read(this.baseType) / this.coef;
 		},
 		function (value) {
-			this.binary.write(this.baseType, Math.round(value * this.coef));
+			this.binary.write(this.baseType, value * this.coef);
 		}
 	),
 
@@ -112,7 +118,7 @@ var MP4 = jBinary.FileFormat({
 		function () {
 			var atoms = {}, end = toValue(this, this.end) || this.binary.getContext('_end')._end;
 			while (this.binary.tell() < end) {
-				var item = this.binary.read('AnyBox');
+				var item = this.binary.read('Box');
 				(atoms[item.type] || (atoms[item.type] = [])).push(item);
 			}
 			return {atoms: atoms};
@@ -121,13 +127,13 @@ var MP4 = jBinary.FileFormat({
 			for (var type in parent.atoms) {
 				var atoms = parent.atoms[type];
 				for (var i = 0, length = atoms.length; i < length; i++) {
-					this.binary.write('AnyBox', atoms[i]);
+					this.binary.write('Box', atoms[i]);
 				}
 			}
 		}
 	),
 
-	MultiBox: ['extend', 'Box', 'Atoms'],
+	MultiBox: ['extend', 'BoxHeader', 'Atoms'],
 
 	TransformationMatrix: {
 		a: ['FixedPoint', 'uint32', 16],
@@ -144,9 +150,8 @@ var MP4 = jBinary.FileFormat({
 	Volume: ['FixedPoint', 'uint16', 8],
 
 	FBVersionable: jBinary.Template(
-		['type0', 'type1'],
-		function () {
-			return this.binary.getContext('version').version ? this.type1 : this.type0;
+		function (type0, type1) {
+			this.baseType = ['if', function () { return this.binary.getContext('version').version }, type1, type0];
 		}
 	),
 
@@ -164,19 +169,21 @@ var MP4 = jBinary.FileFormat({
 		duration: 'FBUint'
 	}],
 
-	ftyp: ['extend', 'Box', {
+	ftyp: ['extend', 'BoxHeader', {
 		major_brand: 'ShortName',
 		minor_version: 'uint32',
 		compatible_brands: ['array', 'ShortName', function () { return (this.binary.getContext(1)._end - this.binary.tell()) / 4 }]
 	}],
 
-	free: 'Box',
+	free: 'BoxHeader',
 
 	RawData: {
 		_rawData: ['blob', function () { return this.binary.getContext('_end')._end - this.binary.tell() }]
 	},
 
-	mdat: ['extend', 'Box', 'RawData'],
+	mdat: ['extend', 'BoxHeader', 'RawData'],
+
+	avcC: ['extend', 'BoxHeader', 'RawData'],
 
 	moov: 'MultiBox',
 
@@ -206,7 +213,7 @@ var MP4 = jBinary.FileFormat({
 
 	tref: 'MultiBox',
 
-	TrackReferenceTypeBox: ['extend', 'Box', {
+	TrackReferenceTypeBox: ['extend', 'BoxHeader', {
 		track_IDs: ['array', 'uint32', function () { return (this.binary.getContext(1)._end - this.binary.tell()) / 4 }]
 	}],
 
@@ -242,8 +249,8 @@ var MP4 = jBinary.FileFormat({
 	hdlr: ['extend', 'FullBox', {
 		_reserved: ['skip', 4],
 		handler_type: ['string', 4],
-		_set_handler_type: function (context) {
-			this.getContext(atomFilter('trak'))._handler_type = context.handler_type;
+		_set_handler_type: function () {
+			this.binary.getContext(atomFilter('trak'))._handler_type = this.binary.getContext().handler_type;
 		},
 		_reserved2: ['skip', 12],
 		name: 'string'
@@ -275,12 +282,12 @@ var MP4 = jBinary.FileFormat({
 
 	stbl: 'MultiBox',
 
-	SampleEntry: ['extend', 'Box', {
+	SampleEntry: ['extend', 'BoxHeader', {
 		_reserved: ['skip', 6],
 		data_reference_index: 'uint16'
 	}],
 
-	btrt: ['extend', 'Box', {
+	btrt: ['extend', 'BoxHeader', {
 		bufferSizeDB: 'uint32',
 		maxBitrate: 'uint32',
 		avgBitrate: 'uint32'
@@ -299,7 +306,7 @@ var MP4 = jBinary.FileFormat({
 		bitratebox: 'btrt'
 	}],
 
-	pasp: ['extend', 'Box', {
+	pasp: ['extend', 'BoxHeader', {
 		spacing: ['Dimensions', 'uint32']
 	}],
 
@@ -308,7 +315,7 @@ var MP4 = jBinary.FileFormat({
 		D: 'uint32'
 	}],
 
-	clap: ['extend', 'Box', {
+	clap: ['extend', 'BoxHeader', {
 		cleanAperture: 'ClapInnerFormat',
 		off: 'ClapInnerFormat'
 	}],
@@ -348,7 +355,7 @@ var MP4 = jBinary.FileFormat({
 
 			for (var propName in this.optional) {
 				var type = this.optional[propName];
-				var atom = this.binary.skip(0, function () { return this.read('Box') });
+				var atom = this.binary.skip(0, function () { return this.read('BoxHeader') });
 				if (atom.type === type) {
 					extension[propName] = this.binary.read(type);
 				}
@@ -393,7 +400,7 @@ var MP4 = jBinary.FileFormat({
 
 	stsd: ['ArrayBox', jBinary.Template(
 		function () {
-			this.baseType = {soun: 'AudioSampleEntry', vide: 'VisualSampleEntry', meta: 'AnyBox'}[this.binary.getContext(atomFilter('trak'))._handler_type] || 'SampleEntry';
+			this.baseType = {soun: 'AudioSampleEntry', vide: 'VisualSampleEntry', meta: 'Box'}[this.binary.getContext(atomFilter('trak'))._handler_type] || 'SampleEntry';
 		}
 	)],
 
@@ -455,13 +462,13 @@ var MP4 = jBinary.FileFormat({
 		location: 'string'
 	}],
 
-	dref: ['ArrayBox', 'AnyBox'],
+	dref: ['ArrayBox', 'Box'],
 
 	stsz: ['extend', 'FullBox', {
 		sample_size: 'uint32',
 		sample_count: 'uint32',
-		_sample_count_to_stbl: function (context) {
-			this.getContext(atomFilter('stbl'))._sample_count = context.sample_count;
+		_sample_count_to_stbl: function () {
+			this.binary.getContext(atomFilter('stbl'))._sample_count = this.binary.getContext().sample_count;
 		},
 		sample_sizes: [
 			'if',
@@ -474,8 +481,8 @@ var MP4 = jBinary.FileFormat({
 		_reserved: ['skip', 3],
 		field_size: 'uint8',
 		sample_count: 'uint32',
-		_sample_count_to_stbl: function (context) {
-			this.getContext(atomFilter('stbl'))._sample_count = context.sample_count;
+		_sample_count_to_stbl: function () {
+			this.binary.getContext(atomFilter('stbl'))._sample_count = this.binary.getContext().sample_count;
 		},
 		sample_sizes: ['array', jBinary.Property(
 			null,
@@ -513,7 +520,7 @@ var MP4 = jBinary.FileFormat({
 			subsample_size: ['FBVersionable', 'uint16', 'uint32'],
 			subsample_priority: 'uint8',
 			discardable: 'uint8',
-			_reserved: 'uint32'
+			_reserved: ['skip', 4]
 		}, function () { return this.binary.getContext().subsample_count }]
 	}],
 
@@ -530,5 +537,10 @@ function atomFilter(type) {
 	};
 }
 
-exports.MP4 = MP4;
+if (typeof module !== 'undefined' && exports === module.exports) {
+	module.exports = MP4;
+} else {
+	exports.MP4 = MP4;
+}
+
 })(this);
