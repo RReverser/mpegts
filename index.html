@@ -1,46 +1,68 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>MPEG-TS Parser demo</title>
-    <script src="/jDataView/src/jdataview.js"></script>
-    <script src="/jBinary/src/jbinary.js"></script>
-    <script src="mpegts.js"></script>
-    <style type="text/css">
-        #jsonContainer { color: #733; font-style: italic; word-wrap: break-word; }
-        .jsonValue { color: #373; font-weight: bold; font-style: normal; }
-    </style>
+	<title>MPEG-TS Parser demo</title>
+	<script src="/jDataView/src/jdataview.js"></script>
+	<script src="/jBinary/src/jbinary.js"></script>
+	<script src="mp4.js"></script>
+	<style type="text/css">
+		#jsonContainer { color: #733; font-style: italic; word-wrap: break-word; }
+		.jsonValue { color: #373; font-weight: bold; font-style: normal; }
+	</style>
 </head>
 <body>
-    <pre id="jsonContainer">
-    </pre>
-    <video id="video"></video>
-    <script>
-        var mpegts = MPEGTS.readFrom('sample.ts', function () {
-            document.getElementById('jsonContainer').innerHTML = // PES
-                JSON.stringify(
-                    [1,2,3,4,5].map(this.readPacket.bind(this)),
-                    function (key, value) {
-                        if (key[0] === '_') return undefined;
+	<pre id="jsonContainer">
+	</pre>
+	<video id="video"></video>
+	<a id="url">Download</a>
+	<script>
+		if (!('time' in console)) {
+			var timeStarts = {};
+			console.time = function (id) {
+				timeStarts[id] = Date.now();
+			};
+			console.timeEnd = function (id) {
+				console.log((Date.now() - timeStarts[id]) + ' ms');
+				delete timeStarts[id];
+			};
+		}
 
-                        if (value instanceof Array && value.length > 100 && (typeof value[0] === 'number')) {
-                            value = value.map(function (value) {
-                                var str = value.toString(16).toUpperCase();
-                                return str.length == 2 ? str : '0' + str;
-                            }).join(' ');
-                        }
+		var mpegts = MP4.loadFrom('sample.mp4', function () {
+			console.time('read');
+			var data = this.read();
+			console.timeEnd('read');
 
-                        return value instanceof Object ? value : '<span class=jsonValue>' + value + '</span>';
-                    },
-                    '    '
-                );
+			var newVideo = new MP4(this.binary.view.byteLength);
+			console.time('write');
+			newVideo.write(data);
+			var url = newVideo.binary.toURL('video/mp4');
+			console.timeEnd('write');
 
-            /*
-            var source = document.createElement('source');
-            source.type = 'video/mp4';
-            source.src = this.parser.toURL(source.type);
-            document.getElementById('video').appendChild(source);
-            */
-        });
-    </script>
+			document.getElementById('jsonContainer').innerHTML =
+				JSON.stringify(
+					data,
+					function (key, value) {
+						if (key[0] === '_') return;
+
+						if (value instanceof Array && value.length > 4 && value.every(function (item) { return (item >= 0 && item <= 255) })) {
+							value = value.map(function (value) {
+								var str = value.toString(16).toUpperCase();
+								return str.length == 2 ? str : '0' + str;
+							}).join(' ');
+						}
+
+						return value instanceof Object ? value : '<span class=jsonValue>' + value + '</span>';
+					},
+					'    '
+				);
+
+			var source = document.createElement('source');
+			source.type = 'video/mp4';
+			source.src = url;
+			document.getElementById('video').appendChild(source);
+
+			document.getElementById('url').href = source.src;
+		});
+	</script>
 </body>
 </html>
