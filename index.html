@@ -4,7 +4,7 @@
 	<title>MPEG-TS Parser demo</title>
 	<script src="/jDataView/src/jdataview.js"></script>
 	<script src="/jBinary/src/jbinary.js"></script>
-	<script src="mp4.js"></script>
+	<script src="mpegts.js"></script>
 	<style type="text/css">
 		#jsonContainer { color: #733; font-style: italic; word-wrap: break-word; }
 		.jsonValue { color: #373; font-weight: bold; font-style: normal; }
@@ -13,7 +13,6 @@
 <body>
 	<pre id="jsonContainer">
 	</pre>
-	<video id="video"></video>
 	<a id="url">Download</a>
 	<script>
 		if (!('time' in console)) {
@@ -27,15 +26,15 @@
 			};
 		}
 
-		var mpegts = MP4.loadFrom('sample.mp4', function () {
+		var mpegts = MPEGTS.loadFrom('sample.ts', function () {
 			console.time('read');
 			var data = this.read();
 			console.timeEnd('read');
 
-			var newVideo = new MP4(this.binary.view.byteLength);
+			var newVideo = new MPEGTS(this.binary.view.byteLength);
 			console.time('write');
 			newVideo.write(data);
-			var url = newVideo.binary.toURL('video/mp4');
+			var url = newVideo.binary.toURL();
 			console.timeEnd('write');
 
 			document.getElementById('jsonContainer').innerHTML =
@@ -56,12 +55,7 @@
 					'    '
 				);
 
-			var source = document.createElement('source');
-			source.type = 'video/mp4';
-			source.src = url;
-			document.getElementById('video').appendChild(source);
-
-			document.getElementById('url').href = source.src;
+			document.getElementById('url').href = url;
 		});
 	</script>
 </body>
