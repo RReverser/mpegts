@@ -5,15 +5,18 @@
 	<script src="/jDataView/src/jdataview.js"></script>
 	<script src="/jBinary/src/jbinary.js"></script>
 	<script src="mpegts.js"></script>
+	<script src="mp4.js"></script>
 	<style type="text/css">
-		#jsonContainer { color: #733; font-style: italic; word-wrap: break-word; }
+		.jsonContainer { color: #733; font-style: italic; word-wrap: break-word; display: block; float: left; width: 50%; overflow-x: scroll; }
 		.jsonValue { color: #373; font-weight: bold; font-style: normal; }
 	</style>
 </head>
 <body>
-	<pre id="jsonContainer">
+	<pre id="mpegts" class="jsonContainer">
 	</pre>
-	<a id="url">Download</a>
+	<pre id="mp4" class="jsonContainer">
+	</pre>
+
 	<script>
 		if (!('time' in console)) {
 			var timeStarts = {};
@@ -26,36 +29,38 @@
 			};
 		}
 
-		var mpegts = MPEGTS.loadFrom('sample.ts', function () {
-			console.time('read');
-			var data = this.read();
-			console.timeEnd('read');
+		[{name: 'MPEGTS', extension: 'ts'}, {name: 'MP4', extension: 'mp4'}].forEach(function (item) {
+			self[item.name].loadFrom('sample.' + item.extension, function () {
+				console.time(item.name + ' read');
+				var data = this.read();
+				console.timeEnd(item.name + ' read');
 
-			var newVideo = new MPEGTS(this.binary.view.byteLength);
-			console.time('write');
-			newVideo.write(data);
-			var url = newVideo.binary.toURL();
-			console.timeEnd('write');
+				/*
+				var newVideo = new MPEGTS(this.binary.view.byteLength);
+				console.time('write');
+				newVideo.write(data);
+				var url = newVideo.binary.toURL();
+				console.timeEnd('write');
+				*/
 
-			document.getElementById('jsonContainer').innerHTML =
-				JSON.stringify(
-					data,
-					function (key, value) {
-						if (key[0] === '_') return;
+				document.getElementById(item.name.toLowerCase()).innerHTML =
+					JSON.stringify(
+						data,
+						function (key, value) {
+							if (key[0] === '_') return;
 
-						if (value instanceof Array && value.length > 4 && value.every(function (item) { return (item >= 0 && item <= 255) })) {
-							value = value.map(function (value) {
-								var str = value.toString(16).toUpperCase();
-								return str.length == 2 ? str : '0' + str;
-							}).join(' ');
-						}
+							if (value instanceof Array && value.length > 4 && value.every(function (item) { return (item >= 0 && item <= 255) })) {
+								value = value.map(function (value) {
+									var str = value.toString(16).toUpperCase();
+									return str.length == 2 ? str : '0' + str;
+								}).join(' ');
+							}
 
-						return value instanceof Object ? value : '<span class=jsonValue>' + value + '</span>';
-					},
-					'    '
-				);
-
-			document.getElementById('url').href = url;
+							return value instanceof Object ? value : '<span class=jsonValue>' + value + '</span>';
+						},
+						1
+					);
+			});
 		});
 	</script>
 </body>

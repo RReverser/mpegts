@@ -415,7 +415,7 @@ var MP4 = jBinary.FileFormat({
 		},
 		function (array) {
 			this.binary.write(this.lengthType, array.length);
-			this.binary.write(['array', this.itemType, array.length], array);
+			this.binary.write(['array', this.itemType], array);
 		}
 	),
 

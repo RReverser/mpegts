@@ -1,31 +1,25 @@
 (function (exports) {
 
 var MPEGTS = jBinary.FileFormat({
-	PCR: jBinary.Property(
+	PCR: {
+		pts: 33,
+		_reserved: 6,
+		extension: 9
+	},
+
+	DynamicArray: jBinary.Property(
+		['lengthType', 'itemType'],
 		function () {
-			this.baseType = {
-				base: 33,
-				_reserved: 6,
-				extension: 9
-			};
+			var length = this.binary.read(this.lengthType);
+			return this.binary.read(['array', this.itemType, length]);
 		},
-		function () {
-			var pcr = this.binary.read(this.baseType);
-			return 300 * (300 * pcr.base + pcr.extension);
-		},
-		function (time) {
-			time /= 300;
-			this.binary.write(this.baseType, {
-				base: time / 300,
-				extension: time % 300
-			});
+		function (array) {
+			this.binary.write(this.lengthType, array.length);
+			this.binary.write(['array', this.itemType], array);
 		}
 	),
 
-	Field: {
-		length: 'uint8',
-		data: ['blob', function () { return this.binary.getContext().length }]
-	},
+	Field: ['DynamicArray', 'uint8', 'uint8'],
 
 	Flag: jBinary.Property(
 	    ['dependentField'],
@@ -54,16 +48,16 @@ var MPEGTS = jBinary.FileFormat({
 		discontinuity: 1,
 		randomAccess: 1,
 		priority: 1,
-		hasPCR: ['Flag', 'pcr'],
-		hasOPCR: ['Flag', 'opcr'],
-		hasSplicingPoint: ['Flag', 'spliceCountdown'],
-		hasTransportPrivateData: ['Flag', 'privateData'],
-		hasExtension: ['Flag', 'extension'],
-		pcr: ['FlagDependent', 'hasPCR', 'PCR'],
-		opcr: ['FlagDependent', 'hasOPCR', 'PCR'],
-		spliceCountdown: ['FlagDependent', 'hasSplicingPoint', 'uint8'],
-		privateData: ['FlagDependent', 'hasTransportPrivateData', 'Field'],
-		extension: ['FlagDependent', 'hasExtension', 'Field']
+		_hasPCR: ['Flag', 'pcr'],
+		_hasOPCR: ['Flag', 'opcr'],
+		_hasSplicingPoint: ['Flag', 'spliceCountdown'],
+		_hasTransportPrivateData: ['Flag', 'privateData'],
+		_hasExtension: ['Flag', 'extension'],
+		pcr: ['FlagDependent', '_hasPCR', 'PCR'],
+		opcr: ['FlagDependent', '_hasOPCR', 'PCR'],
+		spliceCountdown: ['FlagDependent', '_hasSplicingPoint', 'uint8'],
+		privateData: ['FlagDependent', '_hasTransportPrivateData', 'Field'],
+		extension: ['FlagDependent', '_hasExtension', 'Field']
 	},
 
 	PES: {
@@ -88,21 +82,21 @@ var MPEGTS = jBinary.FileFormat({
 				return !(streamId == 0xBE || streamId == 0xBF);
 			},
 			{
-					_prefix: ['const', 2, 2],
-					scramblingControl: 2,
-					priority: 1,
-					dataAlignment: 1,
-					hasCopyright: 1,
-					isOriginal: 1,
-					ptsdts: 2,
-					hasESCR: 1,
-					hasESRate: 1,
-					dsmTrickMode: 1,
-					extraCopyInfo: 1,
-					hasPESCRC: 1,
-					hasPESExtension: 1,
-					length: 'uint8',
-					_skip: ['skip', function () { return this.binary.getContext().length }]
+				_prefix: ['const', 2, 2],
+				scramblingControl: 2,
+				priority: 1,
+				dataAlignment: 1,
+				hasCopyright: 1,
+				isOriginal: 1,
+				ptsdts: 2,
+				hasESCR: 1,
+				hasESRate: 1,
+				dsmTrickMode: 1,
+				extraCopyInfo: 1,
+				hasPESCRC: 1,
+				hasPESExtension: 1,
+				length: 'uint8',
+				_skip: ['skip', function () { return this.binary.getContext().length }]
 			}
 		],
 		elementaryStream: ['blob', function () {
@@ -111,131 +105,145 @@ var MPEGTS = jBinary.FileFormat({
 		}]
 	},
 
-	PrivateSection: {
-		pointerField: ['if', tsHeader.payloadStart, 'uint8'],
+	PrivateSection: ['extend', {
+		pointerField: ['if', function () { return this.binary.getContext(1).payloadStart }, 'uint8'],
 		tableId: 'uint8',
 		isLongSection: 1,
 		isPrivate: 1,
 		_reserved: 2,
-		sectionLength: 12,
+		sectionLength: 12
+	}, [
+		'if',
+		function () { return this.binary.getContext().isLongSection },
+		{
+			tableIdExt: 'uint16',
+			_reserved: 2,
+			versionNumber: 5,
+			currentNextIndicator: 1,
+			sectionNumber: 'uint8',
+			lastSectionNumber: 'uint8',
 
-		data: function () {
-			if (!this.current.isLongSection) {
-				return this.parse(['blob', this.current.sectionLength]);
-			}
+			dataLength: function () { return this.binary.getContext(1).sectionLength - 9 },
 
-			var header = this.parse({
-				tableIdExt: 'uint16',
-				_reserved: 2,
-				versionNumber: 5,
-				currentNextIndicator: 1,
-				sectionNumber: 'uint8',
-				lastSectionNumber: 'uint8'
-			});
+			data: jBinary.Property(null, function () {
+				var data, file = this.binary.getContext(3), header = this.binary.getContext(), dataLength = header.dataLength;
 
-			var dataLength = this.current.sectionLength - 9, data;
-
-			switch (this.current.tableId) {
-				case 0:
-					data = this.parse(['array', {
-						programNumber: 'uint16',
-						_reserved: 3,
-						pid: 13
-					}, dataLength / 4]);
-
-					if (header.sectionNumber == 0) {
-						mpegts.pat = {};
-					}
-
-					for (var i = 0; i < data.length; i++) {
-						mpegts.pat[data[i].pid] = data[i];
-					}
-
-					break;
-
-				case 2:
-					data = this.parse({
-						_reserved: 3,
-						pcrPID: 13,
-						_reserved2: 4,
-						programInfoLength: 12
-					});
-
-					data.programDescriptors = this.parse(['blob', data.programInfoLength]);
-					data.mappings = [];
-
-					dataLength -= 4 + data.programInfoLength;
-
-					while (dataLength > 0) {
-						var mapping = this.parse({
-							streamType: 'uint8',
+				switch (this.binary.getContext(1).tableId) {
+					case 0:
+						data = this.binary.read(['array', {
+							programNumber: 'uint16',
 							_reserved: 3,
-							elementaryPID: 13,
+							pid: 13
+						}, dataLength / 4]);
+
+						if (header.sectionNumber == 0) {
+							file.pat = {};
+						}
+
+						for (var i = 0; i < data.length; i++) {
+							file.pat[data[i].pid] = data[i];
+						}
+
+						break;
+
+					case 2:
+						data = this.binary.read({
+							_reserved: 3,
+							pcrPID: 13,
 							_reserved2: 4,
-							esInfoLength: 12
+							programDescriptors: ['DynamicArray', 12, 'uint8']
 						});
-						mapping.esInfo = this.parse(['blob', mapping.esInfoLength]);
-						data.mappings.push(mapping);
 
-						dataLength -= 5 + mapping.esInfoLength;
-					}
+						data.mappings = [];
 
-					if (header.sectionNumber == 0) {
-						mpegts.pmt = {};
-					}
+						dataLength -= 4 + data.programDescriptors.length;
 
-					for (var i = 0; i < data.mappings.length; i++) {
-						mpegts.pmt[data.mappings[i].elementaryPID] = data.mappings[i];
-					}
+						while (dataLength > 0) {
+							var mapping = this.binary.read({
+								streamType: 'uint8',
+								_reserved: 3,
+								elementaryPID: 13,
+								_reserved2: 4,
+								esInfo: ['DynamicArray', 12, 'uint8']
+							});
+							data.mappings.push(mapping);
 
-					break;
+							dataLength -= 5 + mapping.esInfo.length;
+						}
 
-				default:
-					data = this.parse(['blob', dataLength]);
-					break;
+						if (header.sectionNumber == 0) {
+							file.pmt = {};
+						}
+
+						for (var i = 0; i < data.mappings.length; i++) {
+							file.pmt[data.mappings[i].elementaryPID] = data.mappings[i];
+						}
+
+						break;
+
+					default:
+						data = this.binary.read(['blob', dataLength]);
+						break;
+				}
+
+				return data;
+			}),
+
+			crc32: 'uint32'
+		},
+		['blob', function () { return this.binary.getContext().sectionLength }]
+	]],
+
+	Packet: {
+		_startof: function () { return this.binary.tell() },
+
+		_syncByte: ['const', 'uint8', 0x47, true],
+
+		transportError: 1,
+		payloadStart: 1,
+		transportPriority: 1,
+		pid: 13,
+
+		scramblingControl: 2,
+		_hasAdaptationField: ['Flag', 'adaptationField'],
+		_hasPayload: ['Flag', 'payload'],
+		contCounter: 4,
+
+		adaptationField: ['FlagDependent', '_hasAdaptationField', 'AdaptationField'],
+
+		payload: ['FlagDependent', '_hasPayload', jBinary.Template(
+			null,
+			function () {
+				var pid = this.binary.getContext().pid, file = this.binary.getContext(1);
+				if (pid < 2 || pid in file.pat) {
+					return 'PrivateSection';
+				}
+				if (pid in file.pmt) {
+					return this.binary.getContext().payloadStart ? 'PES' : ['blob', function () { return 188 - (this.binary.tell() - this.binary.getContext()._startof) }];
+				}
 			}
+		)],
 
-			var crc32 = this.parse('uint32');
-
-			return {
-				header: header,
-				data: data,
-				crc32: crc32
-			};
-		}
+		_skip: ['skip', function () { return 188 - (this.binary.tell() - this.binary.getContext()._startof) }]
 	},
 
-	Packet: function (mpegts) {
-		return this.parse({
-			_startof: function () { return this.binary.tell() },
-
-			_syncByte: ['const', 'uint8', 0x47, true],
-
-			transportError: 1,
-			payloadStart: 1,
-			transportPriority: 1,
-			pid: 13,
-
-			scramblingControl: 2,
-			hasAdaptationField: ['Flag', 'adaptationField'],
-			hasPayload: ['Flag', 'payload'],
-			contCounter: 4,
-
-			adaptationField: ['FlagDependent', 'hasAdaptationField', 'AdaptationField'],
-
-			payload: ['FlagDependent', 'hasPayload', function () {
-				if (this.current.header.pid < 2 || this.current.header.pid in mpegts.pat) {
-					return this.parse(['TSPrivateSection', mpegts, this.current.header]);
-				}
-				if (this.current.header.payloadStart && this.current.header.pid in mpegts.pmt) {
-					return this.parse('PES');
-				}
-			}],
-
-			_skip: ['skip', function () { return 188 - (this.binary.tell() - this.binary.getContext()._startof) }]
-		});
-	}
-}, 'Packet');
+	File: jBinary.Property(
+		function () {
+			this.pat = {};
+			this.pmt = {};
+		},
+		function () {
+			return this.binary.inContext(this, function () {
+				return this.read(['array', 'Packet', 5/*this.view.byteLength / 188*/]);
+			});
+		},
+		function (packets) {
+			this.binary.inContext(this, function () {
+				this.write(['array', 'Packet'], packets);
+			});
+		}
+	)
+}, 'File');
 
 if (typeof module !== 'undefined' && exports === module.exports) {
 	module.exports = MPEGTS;
