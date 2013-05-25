@@ -7,7 +7,7 @@
 	<script src="mpegts.js"></script>
 	<script src="mp4.js"></script>
 	<style type="text/css">
-		.jsonContainer { color: #733; font-style: italic; word-wrap: break-word; display: block; float: left; width: 50%; overflow-x: scroll; }
+		.jsonContainer { color: #733; font-style: italic; word-wrap: break-word; display: block; float: left; width: 45%; margin-right: 2%; overflow-x: scroll; }
 		.jsonValue { color: #373; font-weight: bold; font-style: normal; }
 	</style>
 </head>
@@ -29,11 +29,18 @@
 			};
 		}
 
+		function timeFor(name, callback) {
+			console.time(name);
+			callback();
+			console.timeEnd(name);
+		}
+
 		[{name: 'MPEGTS', extension: 'ts'}, {name: 'MP4', extension: 'mp4'}].forEach(function (item) {
 			self[item.name].loadFrom('sample.' + item.extension, function () {
-				console.time(item.name + ' read');
-				var data = this.read();
-				console.timeEnd(item.name + ' read');
+				var data, file = this;
+				timeFor(item.name + ' read', function () {
+					data = file.read();
+				});
 
 				/*
 				var newVideo = new MPEGTS(this.binary.view.byteLength);
@@ -49,7 +56,7 @@
 						function (key, value) {
 							if (key[0] === '_') return;
 
-							if (value instanceof Array && value.length > 4 && value.every(function (item) { return (item >= 0 && item <= 255) })) {
+							if (value instanceof Array && value.every(function (item) { return (item >= 0 && item <= 255) })) {
 								value = value.map(function (value) {
 									var str = value.toString(16).toUpperCase();
 									return str.length == 2 ? str : '0' + str;

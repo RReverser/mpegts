@@ -45,6 +45,7 @@ var MPEGTS = jBinary.FileFormat({
 
 	AdaptationField: {
 		length: 'uint8',
+		_endOf: function () { return this.binary.tell() + this.binary.getContext().length },
 		discontinuity: 1,
 		randomAccess: 1,
 		priority: 1,
@@ -57,64 +58,24 @@ var MPEGTS = jBinary.FileFormat({
 		opcr: ['FlagDependent', '_hasOPCR', 'PCR'],
 		spliceCountdown: ['FlagDependent', '_hasSplicingPoint', 'uint8'],
 		privateData: ['FlagDependent', '_hasTransportPrivateData', 'Field'],
-		extension: ['FlagDependent', '_hasExtension', 'Field']
+		extension: ['FlagDependent', '_hasExtension', 'Field'],
+		_toEnd: function () { this.binary.seek(this.binary.getContext()._endOf) }
 	},
 
-	PES: {
-		_prefix0: ['const', 'uint8', 0x00, true],
-		_prefix1: ['const', 'uint8', 0x00, true],
-		_prefix2: ['const', 'uint8', 0x01, true],
-		streamId: 'uint8',
-		length: jBinary.Property(
-			null,
-			function () {
-				return this.binary.read('uint16') || (188 - (this.binary.tell() % 188));
-			},
-			function (value) {
-				this.binary.write('uint16', value);
-			}
-		),
-		_beforeExtension: function () { return this.binary.tell() },
-		extension: [
-			'if',
-			function () {
-				var streamId = this.binary.getContext().streamId;
-				return !(streamId == 0xBE || streamId == 0xBF);
-			},
-			{
-				_prefix: ['const', 2, 2],
-				scramblingControl: 2,
-				priority: 1,
-				dataAlignment: 1,
-				hasCopyright: 1,
-				isOriginal: 1,
-				ptsdts: 2,
-				hasESCR: 1,
-				hasESRate: 1,
-				dsmTrickMode: 1,
-				extraCopyInfo: 1,
-				hasPESCRC: 1,
-				hasPESExtension: 1,
-				length: 'uint8',
-				_skip: ['skip', function () { return this.binary.getContext().length }]
-			}
-		],
-		elementaryStream: ['blob', function () {
-			var context = this.binary.getContext();
-			return context.length - (this.binary.tell() - context._beforeExtension);
-		}]
+	ES: {
+		_rawStream: ['blob', function () { return 188 - (this.binary.tell() % 188) }]
 	},
 
 	PrivateSection: ['extend', {
-		pointerField: ['if', function () { return this.binary.getContext(1).payloadStart }, 'uint8'],
-		tableId: 'uint8',
+		pointerField: ['if', 'payloadStart', 'uint8'],
+		tableId: ['enum', 'uint8', ['PAT', 'CAT', 'PMT']],
 		isLongSection: 1,
 		isPrivate: 1,
 		_reserved: 2,
-		sectionLength: 12
+		_sectionLength: 12
 	}, [
 		'if',
-		function () { return this.binary.getContext().isLongSection },
+		['isLongSection'],
 		{
 			tableIdExt: 'uint16',
 			_reserved: 2,
@@ -123,13 +84,13 @@ var MPEGTS = jBinary.FileFormat({
 			sectionNumber: 'uint8',
 			lastSectionNumber: 'uint8',
 
-			dataLength: function () { return this.binary.getContext(1).sectionLength - 9 },
+			_dataLength: function () { return this.binary.getContext(1)._sectionLength - 9 },
 
 			data: jBinary.Property(null, function () {
-				var data, file = this.binary.getContext(3), header = this.binary.getContext(), dataLength = header.dataLength;
+				var data, file = this.binary.getContext(3), header = this.binary.getContext(), dataLength = header._dataLength;
 
 				switch (this.binary.getContext(1).tableId) {
-					case 0:
+					case 'PAT':
 						data = this.binary.read(['array', {
 							programNumber: 'uint16',
 							_reserved: 3,
@@ -146,7 +107,7 @@ var MPEGTS = jBinary.FileFormat({
 
 						break;
 
-					case 2:
+					case 'PMT':
 						data = this.binary.read({
 							_reserved: 3,
 							pcrPID: 13,
@@ -176,13 +137,14 @@ var MPEGTS = jBinary.FileFormat({
 						}
 
 						for (var i = 0; i < data.mappings.length; i++) {
-							file.pmt[data.mappings[i].elementaryPID] = data.mappings[i];
+							var mapping = data.mappings[i];
+							file.pmt[mapping.elementaryPID] = mapping;
 						}
 
 						break;
 
 					default:
-						data = this.binary.read(['blob', dataLength]);
+						this.binary.skip(dataLength);
 						break;
 				}
 
@@ -191,7 +153,7 @@ var MPEGTS = jBinary.FileFormat({
 
 			crc32: 'uint32'
 		},
-		['blob', function () { return this.binary.getContext().sectionLength }]
+		['blob', function () { return this.binary.getContext()._sectionLength }]
 	]],
 
 	Packet: {
@@ -219,7 +181,7 @@ var MPEGTS = jBinary.FileFormat({
 					return 'PrivateSection';
 				}
 				if (pid in file.pmt) {
-					return this.binary.getContext().payloadStart ? 'PES' : ['blob', function () { return 188 - (this.binary.tell() - this.binary.getContext()._startof) }];
+					return 'ES';
 				}
 			}
 		)],
@@ -233,9 +195,31 @@ var MPEGTS = jBinary.FileFormat({
 			this.pmt = {};
 		},
 		function () {
-			return this.binary.inContext(this, function () {
-				return this.read(['array', 'Packet', 5/*this.view.byteLength / 188*/]);
+			var packets = this.binary.inContext(this, function () {
+				return this.read(['array', 'Packet', this.view.byteLength / 188]);
 			});
+			var stream = new jDataView(this.binary.view.byteLength, undefined, undefined, true);
+			for (var i = 0, length = packets.length; i < length; i++) {
+				var payload = packets[i].payload;
+				if (!payload || !payload._rawStream) continue;
+				stream.writeBytes(payload._rawStream);
+			}
+			var original = stream.getBytes(stream.tell(), 0);
+			stream.seek(0);
+			for (var i = 0, start = 0, streamId, length = original.length; i <= length; i++) {
+				if (i === length || (original[i] === 0 && original[i + 1] === 0 && (original[i + 2] === 1 || (original[i + 2] === 0 && original[i + 3] === 1)))) {
+					if (i > start && streamId < 0x80) {
+						stream.writeUint32(i - start, false);
+						stream.writeBytes(original.slice(start, i));
+					}
+					i += original[i + 2] ? 3 : 4;
+					start = i;
+					streamId = original[i];
+					// if (streamId) console.log(streamId.toString(16));
+				}
+			}
+			stream = stream.slice(0, stream.tell());
+			return stream.getBytes();
 		},
 		function (packets) {
 			this.binary.inContext(this, function () {

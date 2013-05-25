@@ -151,7 +151,7 @@ var MP4 = jBinary.FileFormat({
 
 	FBVersionable: jBinary.Template(
 		function (type0, type1) {
-			this.baseType = ['if', function () { return this.binary.getContext('version').version }, type1, type0];
+			this.baseType = ['if', 'version', type1, type0];
 		}
 	),
 
@@ -178,7 +178,7 @@ var MP4 = jBinary.FileFormat({
 	free: 'BoxHeader',
 
 	RawData: {
-		_rawData: ['blob', function () { return this.binary.getContext('_end')._end - this.binary.tell() }]
+		rawData: ['blob', function () { return this.binary.getContext('_end')._end - this.binary.tell() }]
 	},
 
 	mdat: ['extend', 'BoxHeader', 'RawData'],
@@ -500,8 +500,8 @@ var MP4 = jBinary.FileFormat({
 			this.binary.getContext(atomFilter('stbl'))._sample_count = this.binary.getContext().sample_count;
 		},
 		sample_sizes: [
-			'if',
-			function () { return !this.binary.getContext().sample_size },
+			'ifNot',
+			['sample_size'],
 			['array', 'uint32', function () { return this.binary.getContext().sample_count }]
 		]
 	}],
