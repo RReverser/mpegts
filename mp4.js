@@ -121,19 +121,24 @@ var MP4 = jBinary.FileFormat({
 				var item = this.binary.read('Box');
 				(atoms[item.type] || (atoms[item.type] = [])).push(item);
 			}
-			return {atoms: atoms};
+			return atoms;
 		},
 		function (parent) {
-			for (var type in parent.atoms) {
-				var atoms = parent.atoms[type];
+			for (var type in parent) {
+				var atoms = parent[type];
 				for (var i = 0, length = atoms.length; i < length; i++) {
+					atoms[i].type = type;
 					this.binary.write('Box', atoms[i]);
 				}
 			}
 		}
 	),
 
-	MultiBox: ['extend', 'BoxHeader', 'Atoms'],
+	ChildAtoms: {
+		atoms: 'Atoms'
+	},
+
+	MultiBox: ['extend', 'BoxHeader', 'ChildAtoms'],
 
 	TransformationMatrix: {
 		a: ['FixedPoint', 'uint32', 16],
@@ -178,7 +183,7 @@ var MP4 = jBinary.FileFormat({
 	free: 'BoxHeader',
 
 	RawData: {
-		rawData: ['blob', function () { return this.binary.getContext('_end')._end - this.binary.tell() }]
+		_rawData: ['blob', function () { return this.binary.getContext('_end')._end - this.binary.tell() }]
 	},
 
 	mdat: ['extend', 'BoxHeader', 'RawData'],
@@ -193,7 +198,7 @@ var MP4 = jBinary.FileFormat({
 				},
 				function (paramSet) {
 					this.binary.write('uint16', paramSet.length);
-					this.binary.write(['blob', paramSet.length], paramSet);
+					this.binary.write('blob', paramSet);
 				}
 			)];
 		}
@@ -361,7 +366,6 @@ var MP4 = jBinary.FileFormat({
 				return name;
 			},
 			function (value) {
-				if (value.length > 31) value = value.slice(0, 31);
 				this.binary.write('uint8', value.length);
 				this.binary.write(['string', value.length], value);
 				this.binary.skip(32 - 1 - value.length);
@@ -397,7 +401,7 @@ var MP4 = jBinary.FileFormat({
 				}
 			}
 		}
-	), 'Atoms'],
+	), 'ChildAtoms'],
 
 	AudioSampleEntry: ['extend', 'SampleEntry', {
 		_reserved: ['skip', 8],
@@ -427,9 +431,18 @@ var MP4 = jBinary.FileFormat({
 		}
 	),
 
-	stsd: ['ArrayBox', jBinary.Template(
+	stsd: ['ArrayBox', jBinary.Property(
 		function () {
 			this.baseType = {soun: 'AudioSampleEntry', vide: 'VisualSampleEntry', meta: 'Box'}[this.binary.getContext(atomFilter('trak'))._handler_type] || 'SampleEntry';
+		},
+		function () {
+			return this.binary.read(this.baseType);
+		},
+		function (value) {
+			var pos = this.binary.tell();
+			this.binary.write(this.baseType, value);
+			var size = this.binary.tell() - pos;
+			this.binary.seek(pos, function () { this.write('uint32', size) });
 		}
 	)],
 
@@ -500,7 +513,7 @@ var MP4 = jBinary.FileFormat({
 			this.binary.getContext(atomFilter('stbl'))._sample_count = this.binary.getContext().sample_count;
 		},
 		sample_sizes: [
-			'ifNot',
+			'if_not',
 			['sample_size'],
 			['array', 'uint32', function () { return this.binary.getContext().sample_count }]
 		]

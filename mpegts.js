@@ -67,7 +67,7 @@ var MPEGTS = jBinary.FileFormat({
 	},
 
 	PrivateSection: ['extend', {
-		pointerField: ['if', 'payloadStart', 'uint8'],
+		pointerField: ['if', ['payloadStart', 1], 'uint8'],
 		tableId: ['enum', 'uint8', ['PAT', 'CAT', 'PMT']],
 		isLongSection: 1,
 		isPrivate: 1,
@@ -195,31 +195,9 @@ var MPEGTS = jBinary.FileFormat({
 			this.pmt = {};
 		},
 		function () {
-			var packets = this.binary.inContext(this, function () {
+			return this.binary.inContext(this, function () {
 				return this.read(['array', 'Packet', this.view.byteLength / 188]);
 			});
-			var stream = new jDataView(this.binary.view.byteLength, undefined, undefined, true);
-			for (var i = 0, length = packets.length; i < length; i++) {
-				var payload = packets[i].payload;
-				if (!payload || !payload._rawStream) continue;
-				stream.writeBytes(payload._rawStream);
-			}
-			var original = stream.getBytes(stream.tell(), 0);
-			stream.seek(0);
-			for (var i = 0, start = 0, streamId, length = original.length; i <= length; i++) {
-				if (i === length || (original[i] === 0 && original[i + 1] === 0 && (original[i + 2] === 1 || (original[i + 2] === 0 && original[i + 3] === 1)))) {
-					if (i > start && streamId < 0x80) {
-						stream.writeUint32(i - start, false);
-						stream.writeBytes(original.slice(start, i));
-					}
-					i += original[i + 2] ? 3 : 4;
-					start = i;
-					streamId = original[i];
-					// if (streamId) console.log(streamId.toString(16));
-				}
-			}
-			stream = stream.slice(0, stream.tell());
-			return stream.getBytes();
 		},
 		function (packets) {
 			this.binary.inContext(this, function () {
