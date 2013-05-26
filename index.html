@@ -27,7 +27,7 @@
 			};
 		}
 
-		MPEGTS.loadFrom('sample2.ts', function () {
+		MPEGTS.loadFrom('sample.ts', function () {
 			console.time('convert');
 
 			console.time('read');
@@ -58,7 +58,7 @@
 			console.timeEnd('getStream');
 
 			console.time('filter');
-			var original = stream.getBytes(stream.tell(), 0, true, true), sps, pps, accessPoints = [], IDR = [], prevAccessPoint = 0;
+			var original = stream.getBytes(stream.tell(), 0, true, true), sps, pps, spsInfo, accessPoints = [], IDR = [], prevAccessPoint = 0;
 			stream.seek(0);
 			for (var i = 0, start = 0, streamId, length = original.length; i <= length; i++) {
 				if (i === length || (original[i] === 0 && original[i + 1] === 0 && (original[i + 2] === 1 || (original[i + 2] === 0 && original[i + 3] === 1)))) {
@@ -70,6 +70,7 @@
 						case 0x67:
 							if (!sps) {
 								sps = original.slice(start, i);
+								spsInfo = new jBinary(sps, H264).read('SPS');
 							}
 							break;
 
@@ -221,9 +222,9 @@
 																atoms: {
 																	avcC: [{
 																		version: 1,
-																		profileIndication: 77,
-																		profileCompatibility: 64,
-																		levelIndication: 30,
+																		profileIndication: spsInfo.profile_idc,
+																		profileCompatibility: spsInfo.constraint_set_flags << 4,
+																		levelIndication: spsInfo.level_idc,
 																		lengthSizeMinusOne: 3,
 																		seqParamSets: [sps],
 																		pictParamSets: [pps]

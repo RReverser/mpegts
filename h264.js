@@ -20,7 +20,7 @@ var H264 = {
 		nal_ref_idc: 2,
 		nal_unit_type: 5,
 		profile_idc: 'uint8',
-		constraint_set_flags: ['array', 1, 4],
+		constraint_set_flags: 4,
 		_reserved: 4,
 		level_idc: 'uint8',
 		seq_parameter_set_id: 'ExpGolomb',
@@ -35,8 +35,7 @@ var H264 = {
 		direct_8x8_inference_flag: 1,
 		frame_cropping_flag: 1,
 		vui_parameters_present_flag: 1,
-		rbsp_stop_one_bit: 1,
-		_padding: function () { this.binary._bitShift = 0 }
+		rbsp_stop_one_bit: 1
 	}
 };
 
