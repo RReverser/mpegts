@@ -186,7 +186,7 @@ var MPEGTS = jBinary.FileFormat({
 			}
 		)],
 
-		_skip: ['skip', function () { return 188 - (this.binary.tell() - this.binary.getContext()._startof) }]
+		_toEnd: function () { this.binary.seek(this.binary.getContext()._startof + 188) }
 	},
 
 	File: jBinary.Property(
@@ -205,7 +205,7 @@ var MPEGTS = jBinary.FileFormat({
 			});
 		}
 	)
-}, 'File');
+}, 'File', 'video/mp2t');
 
 if (typeof module !== 'undefined' && exports === module.exports) {
 	module.exports = MPEGTS;

@@ -6,6 +6,7 @@
 	<script src="/jBinary/src/jbinary.js"></script>
 	<script src="mpegts.js"></script>
 	<script src="mp4.js"></script>
+	<script src="h264.js"></script>
 	<style type="text/css">
 		.jsonContainer { color: #733; font-style: italic; word-wrap: break-word; display: block; float: left; width: 45%; margin-right: 2%; overflow-x: scroll; }
 		.jsonValue { color: #373; font-weight: bold; font-style: normal; }
@@ -21,31 +22,49 @@
 				timeStarts[id] = Date.now();
 			};
 			console.timeEnd = function (id) {
-				console.log((Date.now() - timeStarts[id]) + ' ms');
+				console.log(id + ': ' + (Date.now() - timeStarts[id]) + ' ms');
 				delete timeStarts[id];
 			};
 		}
 
-		function timeFor(name, callback) {
-			console.time(name);
-			callback();
-			console.timeEnd(name);
-		}
-
 		MPEGTS.loadFrom('sample2.ts', function () {
-			var packets = this.read();
+			console.time('convert');
 
-			var stream = new jDataView(this.binary.view.byteLength, undefined, undefined, true);
+			console.time('read');
+			var packets = this.read();
+			console.timeEnd('read');
+
+			console.time('getStream');
+			var stream = new jDataView(this.binary.view.byteLength);
 			for (var i = 0, length = packets.length; i < length; i++) {
 				var payload = packets[i].payload;
 				if (!payload || !payload._rawStream) continue;
 				stream.writeBytes(payload._rawStream);
 			}
-			var original = stream.getBytes(stream.tell(), 0), paramSets = {}, accessPoints = [], prevAccessPoint = 0;
+			console.timeEnd('getStream');
+
+			console.time('filter');
+			var original = stream.getBytes(stream.tell(), 0, true, true), sps, pps, accessPoints = [], IDR = [], prevAccessPoint = 0;
 			stream.seek(0);
 			for (var i = 0, start = 0, streamId, length = original.length; i <= length; i++) {
 				if (i === length || (original[i] === 0 && original[i + 1] === 0 && (original[i + 2] === 1 || (original[i + 2] === 0 && original[i + 3] === 1)))) {
 					switch (streamId) {
+						case 0x65:
+							IDR.push(accessPoints.length + 1);
+							break;
+
+						case 0x67:
+							if (!sps) {
+								sps = original.slice(start, i);
+							}
+							break;
+
+						case 0x68:
+							if (!pps) {
+								pps = original.slice(start, i);
+							}
+							break;
+
 						case 0x09:
 							var pos = stream.tell();
 							if (pos > prevAccessPoint) {
@@ -53,16 +72,9 @@
 								prevAccessPoint = pos;
 							}
 							break;
-
-						case 0x67:
-						case 0x68:
-							if (!(streamId in paramSets)) {
-								paramSets[streamId] = [original.slice(start, i)];
-							}
-							break;
 					}
-					if (i > start && (streamId < 0x80)) {
-						stream.writeUint32(i - start, false);
+					if (i > start && streamId < 0x80) {
+						stream.writeUint32(i - start);
 						stream.writeBytes(original.slice(start, i));
 					}
 					i += original[i + 2] ? 3 : 4;
@@ -73,8 +85,11 @@
 			var pos = stream.tell();
 			if (pos > prevAccessPoint) {
 				accessPoints.push(pos - prevAccessPoint);
-				prevAccessPoint = pos;
-			}			var file = new MP4(stream.byteLength);
+			}
+			console.timeEnd('filter');
+
+			console.time('build');
+			var file = new MP4(stream.byteLength);
 			file.write({
 				ftyp: [{
 					major_brand: 'isom',
@@ -147,85 +162,136 @@
 											flags: 0,
 											handler_type: 'vide',
 											name: 'VideoHandler'
-										}]
-									}
-								}],
-								minf: [{
-									atoms: {
-										vmhd: [{
-											version: 0,
-											flags: 1,
-											graphicsmode: 0,
-											opcolor: {r: 0, g: 0, b: 0}
-										}]
-									}
-								}],
-								dinf: [{
-									atoms: {
-										dref: [{
-											version: 0,
-											flags: 0,
-											entries: [{
-												type: 'url ',
-												version: 0,
-												flags: 1,
-												location: ''
-											}]
-										}]
-									}
-								}],
-								stbl: [{
-									atoms: {
-										stsd: [{
-											version: 0,
-											flags: 0,
-											entries: [{
-												type: 'avc1',
-												data_reference_index: 1,
-												dimensions: {
-													horz: 720,
-													vert: 404
-												},
-												resolution: {
-													horz: 72,
-													vert: 72
-												},
-												frame_count: 1,
-												compressorname: '',
-												depth: 24,
-												atoms: {
-													avcC: [{
-														version: 1,
-														profileIndication: 77,
-														profileCompatibility: 64,
-														levelIndication: 30,
-														lengthSizeMinusOne: 3,
-														seqParamSets: paramSets[0x67],
-														pictParamSets: paramSets[0x68]
-													}]
-												}
-											}]
 										}],
-										stsc: [{
-											version: 0,
-											flags: 0,
-											entries: [{
-												first_chunk: 1,
-												samples_per_chunk: accessPoints.length,
-												sample_description_index: 1
-											}]
-										}],
-										stsz: [{
-											version: 0,
-											flags: 0,
-											sample_size: 0,
-											sample_count: accessPoints.length,
-											sample_sizes: accessPoints
-										}],
-										stco: [{
-											version: 0,
-											flags: 0,
-											entries: [0x28]
+										minf: [{
+											atoms: {
+												vmhd: [{
+													version: 0,
+													flags: 1,
+													graphicsmode: 0,
+													opcolor: {r: 0, g: 0, b: 0}
+												}],
+												dinf: [{
+													atoms: {
+														dref: [{
+															version: 0,
+															flags: 0,
+															entries: [{
+																type: 'url ',
+																version: 0,
+																flags: 1,
+																location: ''
+															}]
+														}]
+													}
+												}],
+												stbl: [{
+													atoms: {
+														stsd: [{
+															version: 0,
+															flags: 0,
+															entries: [{
+																type: 'avc1',
+																data_reference_index: 1,
+																dimensions: {
+																	horz: 720,
+																	vert: 404
+																},
+																resolution: {
+																	horz: 72,
+																	vert: 72
+																},
+																frame_count: 1,
+																compressorname: '',
+																depth: 24,
+																atoms: {
+																	avcC: [{
+																		version: 1,
+																		profileIndication: 77,
+																		profileCompatibility: 64,
+																		levelIndication: 30,
+																		lengthSizeMinusOne: 3,
+																		seqParamSets: [sps],
+																		pictParamSets: [pps]
+																	}]
+																}
+															}]
+														}],
+														stts: [{
+															version: 0,
+															flags: 0,
+															entries: [
+																{
+																	sample_count: 1,
+																	sample_delta: 3600
+																},
+																{
+																	sample_count: 16,
+																	sample_delta: 6006
+																},
+																{
+																	sample_count: 1,
+																	sample_delta: 6005
+																},
+																{
+																	sample_count: 33,
+																	sample_delta: 6006
+																},
+																{
+																	sample_count: 1,
+																	sample_delta: 6005
+																},
+																{
+																	sample_count: 32,
+																	sample_delta: 6006
+																},
+																{
+																	sample_count: 1,
+																	sample_delta: 6005
+																},
+																{
+																	sample_count: 32,
+																	sample_delta: 6006
+																},
+																{
+																	sample_count: 1,
+																	sample_delta: 6005
+																},
+																{
+																	sample_count: 2,
+																	sample_delta: 6006
+																}
+															]
+														}],
+														stss: [{
+															version: 0,
+															flags: 0,
+															entries: IDR
+														}],
+														stsc: [{
+															version: 0,
+															flags: 0,
+															entries: [{
+																first_chunk: 1,
+																samples_per_chunk: accessPoints.length,
+																sample_description_index: 1
+															}]
+														}],
+														stsz: [{
+															version: 0,
+															flags: 0,
+															sample_size: 0,
+															sample_count: accessPoints.length,
+															sample_sizes: accessPoints
+														}],
+														stco: [{
+															version: 0,
+															flags: 0,
+															entries: [0x28]
+														}]
+													}
+												}]
+											}
 										}]
 									}
 								}]
@@ -234,7 +300,13 @@
 					}
 				}]
 			});
-			document.getElementById('url').href = (new jBinary(file.binary.view.slice(0, file.binary.tell()))).toURL('video/mp4');
+			console.timeEnd('build');
+
+			console.time('generateURL');
+			document.getElementById('url').href = new MP4(file.binary.view.slice(0, file.binary.tell())).toURL();
+			console.timeEnd('generateURL');
+
+			console.timeEnd('convert');
 		});
 	</script>
 </body>

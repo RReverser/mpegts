@@ -572,7 +572,7 @@ var MP4 = jBinary.FileFormat({
 	mehd: ['extend', 'FullBox', {
 		fragment_duration: 'FBUint'
 	}]
-}, ['Atoms', function () { return this.binary.view.byteLength }]);
+}, ['Atoms', function () { return this.binary.view.byteLength }], 'video/mp4');
 
 function atomFilter(type) {
 	return function (atom) {
