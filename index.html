@@ -35,11 +35,25 @@
 			console.timeEnd('read');
 
 			console.time('getStream');
-			var stream = new jDataView(this.binary.view.byteLength);
+			var stream = new jDataView(this.binary.view.byteLength), STTS = [], lastSTTS, prevPTS, duration = 0;
 			for (var i = 0, length = packets.length; i < length; i++) {
-				var payload = packets[i].payload;
-				if (!payload || !payload._rawStream) continue;
-				stream.writeBytes(payload._rawStream);
+				var packet = packets[i], adaptation = packet.adaptationField, payload = packet.payload;
+				if (adaptation && adaptation.pcr) {
+					var pts = adaptation.pcr.pts;
+					if (prevPTS) {
+						var delta = pts - prevPTS;
+						duration += delta;
+						if (lastSTTS && lastSTTS.sample_delta === delta) {
+							lastSTTS.sample_count++;
+						} else {
+							STTS.push(lastSTTS = {sample_count: 1, sample_delta: delta});
+						}
+					}
+					prevPTS = pts;
+				}
+				if (payload && payload._rawStream) {
+					stream.writeBytes(payload._rawStream);
+				}
 			}
 			console.timeEnd('getStream');
 
@@ -104,8 +118,8 @@
 						mvhd: [{
 							version: 0,
 							flags: 0,
-							timescale: 1000,
-							duration: 7982,
+							timescale: 90000,
+							duration: duration,
 							rate: 1,
 							volume: 1,
 							matrix: {
@@ -121,7 +135,7 @@
 									version: 0,
 									flags: 15,
 									track_ID: 1,
-									duration: 7982,
+									duration: duration,
 									layer: 0,
 									alternate_group: 0,
 									volume: 1,
@@ -141,7 +155,7 @@
 											version: 0,
 											flags: 0,
 											entries: [{
-												segment_duration: 7982,
+												segment_duration: duration,
 												media_time: 0,
 												media_rate: 1
 											}]
@@ -154,7 +168,7 @@
 											version: 0,
 											flags: 0,
 											timescale: 90000,
-											duration: 718310,
+											duration: duration,
 											lang: 'und'
 										}],
 										hdlr: [{
@@ -220,48 +234,7 @@
 														stts: [{
 															version: 0,
 															flags: 0,
-															entries: [
-																{
-																	sample_count: 1,
-																	sample_delta: 3600
-																},
-																{
-																	sample_count: 16,
-																	sample_delta: 6006
-																},
-																{
-																	sample_count: 1,
-																	sample_delta: 6005
-																},
-																{
-																	sample_count: 33,
-																	sample_delta: 6006
-																},
-																{
-																	sample_count: 1,
-																	sample_delta: 6005
-																},
-																{
-																	sample_count: 32,
-																	sample_delta: 6006
-																},
-																{
-																	sample_count: 1,
-																	sample_delta: 6005
-																},
-																{
-																	sample_count: 32,
-																	sample_delta: 6006
-																},
-																{
-																	sample_count: 1,
-																	sample_delta: 6005
-																},
-																{
-																	sample_count: 2,
-																	sample_delta: 6006
-																}
-															]
+															entries: STTS
 														}],
 														stss: [{
 															version: 0,
