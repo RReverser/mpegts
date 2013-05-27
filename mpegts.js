@@ -34,9 +34,7 @@ var MPEGTS = jBinary.FileFormat({
 	FlagDependent: jBinary.Property(
 		['flagField', 'baseType'],
 		function () {
-			if (this.binary.getContext()[this.flagField]) {
-				return this.binary.read(this.baseType);
-			}
+			return this.binary.read(['if', this.flagField, this.baseType]);
 		},
 		function () {
 			this.binary.write(this.baseType);
