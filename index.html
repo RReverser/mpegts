@@ -13,21 +13,25 @@
 	</style>
 </head>
 <body>
+	<video id="video" controls></video>
 	<a id="url">Download</a>
 
 	<script>
 		if (!('time' in console)) {
-			var timeStarts = {};
-			console.time = function (id) {
-				timeStarts[id] = Date.now();
-			};
-			console.timeEnd = function (id) {
-				console.log(id + ': ' + (Date.now() - timeStarts[id]) + ' ms');
-				delete timeStarts[id];
-			};
+			(function () {
+				var timeStarts = {}, nowHost = typeof performance !== 'undefined' ? performance : Date;
+				console.time = function (id) {
+					timeStarts[id] = nowHost.now();
+				};
+				console.timeEnd = function (id) {
+					console.log(id + ': ' + (nowHost.now() - timeStarts[id]) + ' ms');
+					document.title = id + ': ' + (nowHost.now() - timeStarts[id]) + ' ms';
+					delete timeStarts[id];
+				};
+			})();
 		}
 
-		MPEGTS.loadFrom('sample.ts', function () {
+		MPEGTS.loadFrom('chunk-5020.ts', function () {
 			console.time('convert');
 
 			console.time('read');
@@ -42,6 +46,7 @@
 					var pts = adaptation.pcr.pts;
 					if (prevPTS) {
 						var delta = pts - prevPTS;
+						if (delta < 0) console.log(delta, pts, prevPTS);
 						duration += delta;
 						if (lastSTTS && lastSTTS.sample_delta === delta) {
 							lastSTTS.sample_count++;
@@ -57,8 +62,10 @@
 			}
 			console.timeEnd('getStream');
 
+			console.log(STTS, duration);
+
 			console.time('filter');
-			var original = stream.getBytes(stream.tell(), 0, true, true), sps, pps, spsInfo, accessPoints = [], IDR = [], prevAccessPoint = 0;
+			var original = stream.getBytes(stream.tell(), 0, true, true), sps, pps, spsInfo, accessPoints = [], IDR = [], prevAccessPoint = 0, width, height;
 			stream.seek(0);
 			for (var i = 0, start = 0, streamId, length = original.length; i <= length; i++) {
 				if (i === length || (original[i] === 0 && original[i + 1] === 0 && (original[i + 2] === 1 || (original[i + 2] === 0 && original[i + 3] === 1)))) {
@@ -71,6 +78,13 @@
 							if (!sps) {
 								sps = original.slice(start, i);
 								spsInfo = new jBinary(sps, H264).read('SPS');
+								width = (spsInfo.pic_width_in_mbs_minus_1 + 1) * 16;
+								height = (2 - spsInfo.frame_mbs_only_flag) * (spsInfo.pic_height_in_map_units_minus_1 + 1) * 16;
+								var cropping = spsInfo.frame_cropping;
+								if (cropping) {
+									width -= 2 * (cropping.left + cropping.right);
+									height -= 2 * (cropping.top + cropping.bottom);
+								}
 							}
 							break;
 
@@ -88,7 +102,7 @@
 							}
 							break;
 					}
-					if (i > start && streamId < 0x80) {
+					if (i > start) {
 						stream.writeUint32(i - start);
 						stream.writeBytes(original.slice(start, i));
 					}
@@ -146,8 +160,8 @@
 										u: 0, v: 0, w: 1
 									},
 									dimensions: {
-										horz: 720,
-										vert: 404
+										horz: width,
+										vert: height
 									}
 								}],
 								edts: [{
@@ -209,8 +223,8 @@
 																type: 'avc1',
 																data_reference_index: 1,
 																dimensions: {
-																	horz: 720,
-																	vert: 404
+																	horz: width,
+																	vert: height
 																},
 																resolution: {
 																	horz: 72,
@@ -223,7 +237,7 @@
 																	avcC: [{
 																		version: 1,
 																		profileIndication: spsInfo.profile_idc,
-																		profileCompatibility: spsInfo.constraint_set_flags << 4,
+																		profileCompatibility: parseInt(spsInfo.constraint_set_flags.join(''), 2),
 																		levelIndication: spsInfo.level_idc,
 																		lengthSizeMinusOne: 3,
 																		seqParamSets: [sps],
@@ -277,7 +291,9 @@
 			console.timeEnd('build');
 
 			console.time('generateURL');
-			document.getElementById('url').href = new MP4(file.binary.view.slice(0, file.binary.tell())).toURL();
+			document.getElementById('video').src =
+			document.getElementById('url').href =
+			new MP4(file.binary.view.slice(0, file.binary.tell())).toURL();
 			console.timeEnd('generateURL');
 
 			console.timeEnd('convert');

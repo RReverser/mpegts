@@ -140,10 +140,6 @@ var MPEGTS = jBinary.FileFormat({
 						}
 
 						break;
-
-					default:
-						this.binary.skip(dataLength);
-						break;
 				}
 
 				return data;
