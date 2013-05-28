@@ -1,6 +1,0 @@
-[submodule "jBinary"]
-	path = jBinary
-	url = git@bitbucket.org:rreverser/jbinary.git
-[submodule "jDataView"]
-	path = jDataView
-	url = git@github.com:RReverser/jDataView.git
