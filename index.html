@@ -13,13 +13,15 @@
 	</style>
 </head>
 <body>
-	<video id="video" controls></video>
+	<video id="video" controls>
+		<source id="source" type="video/mp4"></source>
+	</video>
 	<a id="url">Download</a>
 
 	<script>
-		if (!('time' in console)) {
+		if (true || !('time' in console)) {
 			(function () {
-				var timeStarts = {}, nowHost = typeof performance !== 'undefined' ? performance : Date;
+				var timeStarts = {}, nowHost = typeof performance !== 'undefined' && 'now' in performance ? performance : Date;
 				console.time = function (id) {
 					timeStarts[id] = nowHost.now();
 				};
@@ -39,22 +41,17 @@
 			console.timeEnd('read');
 
 			console.time('getStream');
-			var stream = new jDataView(this.binary.view.byteLength), STTS = [], lastSTTS, prevPTS, duration = 0;
+			var stream = new jDataView(this.binary.view.byteLength), offset2pts = {};
 			for (var i = 0, length = packets.length; i < length; i++) {
 				var packet = packets[i], adaptation = packet.adaptationField, payload = packet.payload;
-				if (adaptation && adaptation.pcr) {
-					var pts = adaptation.pcr.pts;
-					if (prevPTS) {
-						var delta = pts - prevPTS;
-						if (delta < 0) console.log(delta, pts, prevPTS);
-						duration += delta;
-						if (lastSTTS && lastSTTS.sample_delta === delta) {
-							lastSTTS.sample_count++;
-						} else {
-							STTS.push(lastSTTS = {sample_count: 1, sample_delta: delta});
-						}
-					}
-					prevPTS = pts;
+				if (adaptation && adaptation.pcr && packet.pid === 256) {
+					/*
+					hack: let's store PTS temporarily in our own NALU with
+					streamId=0x87 (forbidden_zero_bit=1, nal_ref_idc=0(is not used to reconstruct reference pictures), nal_unit_type=7(SPS))
+					which should not be used according to spec
+					*/
+					stream.writeBytes([0x00, 0x00, 0x01, 0x87]);
+					offset2pts[stream.tell()] = adaptation.pcr.pts;
 				}
 				if (payload && payload._rawStream) {
 					stream.writeBytes(payload._rawStream);
@@ -62,20 +59,18 @@
 			}
 			console.timeEnd('getStream');
 
-			console.log(STTS, duration);
-
 			console.time('filter');
-			var original = stream.getBytes(stream.tell(), 0, true, true), sps, pps, spsInfo, accessPoints = [], IDR = [], prevAccessPoint = 0, width, height;
+			var original = stream.getBytes(stream.tell(), 0, true, true), accessPoints = [], IDR = [], prevAccessPoint = 0, STTS = [], lastSTTS, prevPTS, ptsDeltaSampleCount = 0, duration = 0, __count = 0;
 			stream.seek(0);
 			for (var i = 0, start = 0, streamId, length = original.length; i <= length; i++) {
 				if (i === length || (original[i] === 0 && original[i + 1] === 0 && (original[i + 2] === 1 || (original[i + 2] === 0 && original[i + 3] === 1)))) {
 					switch (streamId) {
 						case 0x67:
 							if (!sps) {
-								sps = original.slice(start, i);
-								spsInfo = new jBinary(sps, H264).read('SPS');
-								width = (spsInfo.pic_width_in_mbs_minus_1 + 1) * 16;
-								height = (2 - spsInfo.frame_mbs_only_flag) * (spsInfo.pic_height_in_map_units_minus_1 + 1) * 16;
+								var sps = original.slice(start, i);
+								var spsInfo = new jBinary(sps, H264).read('SPS');
+								var width = (spsInfo.pic_width_in_mbs_minus_1 + 1) * 16;
+								var height = (2 - spsInfo.frame_mbs_only_flag) * (spsInfo.pic_height_in_map_units_minus_1 + 1) * 16;
 								var cropping = spsInfo.frame_cropping;
 								if (cropping) {
 									width -= 2 * (cropping.left + cropping.right);
@@ -86,23 +81,40 @@
 
 						case 0x68:
 							if (!pps) {
-								pps = original.slice(start, i);
+								var pps = original.slice(start, i);
 							}
+							break;
+
+						case 0x87:
+							var pts = offset2pts[start + 1];
+							if (prevPTS !== undefined && pts > prevPTS && ptsDeltaSampleCount > 0) {
+								var deltaPTS = pts - prevPTS;
+								duration += deltaPTS;
+								__count += ptsDeltaSampleCount;
+								deltaPTS /= ptsDeltaSampleCount;
+								if (lastSTTS && lastSTTS.sample_delta === deltaPTS) {
+									lastSTTS.sample_count += ptsDeltaSampleCount;
+								} else {
+									STTS.push(lastSTTS = {sample_count: ptsDeltaSampleCount, sample_delta: deltaPTS});
+								}
+								ptsDeltaSampleCount = 0;
+							}
+							prevPTS = pts;
 							break;
 
 						case 0x09:
 							var pos = stream.tell();
-							if (pos > prevAccessPoint) {
-								accessPoints.push(pos - prevAccessPoint);
-								prevAccessPoint = pos;
-							}
+							accessPoints.push(pos - prevAccessPoint);
+							prevAccessPoint = pos;
+							ptsDeltaSampleCount++;
 							break;
 
 						case 0x65:
 							IDR.push(accessPoints.length + 1);
 
 						default:
-							if (i > start) {
+							// copy all that were not parsed yet and do not have forbidden_zero_bit
+							if (i > start && !(streamId & 0x80)) {
 								stream.writeUint32(i - start);
 								stream.writeBytes(original.slice(start, i));
 							}
@@ -113,11 +125,21 @@
 					streamId = original[i];
 				}
 			}
-			var pos = stream.tell();
-			if (pos > prevAccessPoint) {
-				accessPoints.push(pos - prevAccessPoint);
-			}
 			console.timeEnd('filter');
+
+			if (prevPTS !== undefined && ptsDeltaSampleCount > 0) {
+				var deltaPTS = pts - prevPTS;
+				duration += deltaPTS;
+				__count += ptsDeltaSampleCount;
+				deltaPTS /= ptsDeltaSampleCount;
+				if (lastSTTS && lastSTTS.sample_delta === deltaPTS) {
+					lastSTTS.sample_count += ptsDeltaSampleCount;
+				} else {
+					STTS.push(lastSTTS = {sample_count: ptsDeltaSampleCount, sample_delta: deltaPTS});
+				}
+				ptsDeltaSampleCount = 0;
+			}
+			console.log(STTS, accessPoints.length, __count, duration / 90000);
 
 			console.time('build');
 			var file = new MP4(stream.byteLength);
@@ -293,13 +315,14 @@
 			console.timeEnd('build');
 
 			console.time('generateURL');
-			document.getElementById('video').innerHTML = '<source type="video/mp4" src="' +
-			(document.getElementById('url').href = new MP4(file.binary.view.slice(0, file.binary.tell())).toURL())
-			+ '"></source>';
-
+			var url = new MP4(file.binary.view.slice(0, file.binary.tell())).toURL();
 			console.timeEnd('generateURL');
 
 			console.timeEnd('convert');
+
+			document.getElementById('video').src = url;
+			document.getElementById('source').src = url;
+			document.getElementById('url').href = url;
 		});
 	</script>
 </body>
