@@ -33,7 +33,7 @@
 			})();
 		}
 
-		MPEGTS.loadFrom('chunk-5020.ts', function () {
+		MPEGTS.loadFrom('chunk-202.ts', function () {
 			console.time('convert');
 
 			console.time('read');
@@ -60,7 +60,7 @@
 			console.timeEnd('getStream');
 
 			console.time('filter');
-			var original = stream.getBytes(stream.tell(), 0, true, true), accessPoints = [], IDR = [], prevAccessPoint = 0, STTS = [], lastSTTS, prevPTS, ptsDeltaSampleCount = 0, duration = 0, __count = 0;
+			var original = stream.getBytes(stream.tell(), 0, true, true), accessPoints = [], IDR = [], prevAccessPoint = 0, STTS = [], lastSTTS, prevPTS, ptsDeltaSampleCount = 0, duration = 0;
 			stream.seek(0);
 			for (var i = 0, start = 0, streamId, length = original.length; i <= length; i++) {
 				if (i === length || (original[i] === 0 && original[i + 1] === 0 && (original[i + 2] === 1 || (original[i + 2] === 0 && original[i + 3] === 1)))) {
@@ -90,7 +90,6 @@
 							if (prevPTS !== undefined && pts > prevPTS && ptsDeltaSampleCount > 0) {
 								var deltaPTS = pts - prevPTS;
 								duration += deltaPTS;
-								__count += ptsDeltaSampleCount;
 								deltaPTS /= ptsDeltaSampleCount;
 								if (lastSTTS && lastSTTS.sample_delta === deltaPTS) {
 									lastSTTS.sample_count += ptsDeltaSampleCount;
@@ -98,21 +97,37 @@
 									STTS.push(lastSTTS = {sample_count: ptsDeltaSampleCount, sample_delta: deltaPTS});
 								}
 								ptsDeltaSampleCount = 0;
+								prevPTS = pts;
+							} else
+							if (prevPTS === undefined) {
+								prevPTS = pts;
 							}
-							prevPTS = pts;
 							break;
 
 						case 0x09:
-							var pos = stream.tell();
-							accessPoints.push(pos - prevAccessPoint);
-							prevAccessPoint = pos;
 							ptsDeltaSampleCount++;
+							var pos = stream.tell();
+							if (pos > 0) {
+								accessPoints.push(pos - prevAccessPoint);
+								prevAccessPoint = pos;
+								// copy all that were not parsed yet and do not have forbidden_zero_bit
+								if (i > start && !(streamId & 0x80)) {
+									stream.writeUint32(i - start);
+									stream.writeBytes(original.slice(start, i));
+								}
+							}
 							break;
 
 						case 0x65:
 							IDR.push(accessPoints.length + 1);
 
 						default:
+							if (streamId === 0x01 || streamId === 0x41 || streamId === 0x65) {
+								var sliceHeader = new jBinary(new jDataView(original, start + 1, i - start - 1), H264);
+								sliceHeader.read('ExpGolomb');
+								var frameType = ['P', 'B', 'I', 'SP', 'SI'][sliceHeader.read('ExpGolomb') % 5];
+								console.log(frameType);
+							}
 							// copy all that were not parsed yet and do not have forbidden_zero_bit
 							if (i > start && !(streamId & 0x80)) {
 								stream.writeUint32(i - start);
@@ -130,16 +145,15 @@
 			if (prevPTS !== undefined && ptsDeltaSampleCount > 0) {
 				var deltaPTS = pts - prevPTS;
 				duration += deltaPTS;
-				__count += ptsDeltaSampleCount;
 				deltaPTS /= ptsDeltaSampleCount;
-				if (lastSTTS && lastSTTS.sample_delta === deltaPTS) {
+				if (deltaPTS === 0 || (lastSTTS && lastSTTS.sample_delta === deltaPTS)) {
 					lastSTTS.sample_count += ptsDeltaSampleCount;
 				} else {
 					STTS.push(lastSTTS = {sample_count: ptsDeltaSampleCount, sample_delta: deltaPTS});
 				}
 				ptsDeltaSampleCount = 0;
 			}
-			console.log(STTS, accessPoints.length, __count, duration / 90000);
+			console.log(STTS, duration / 90000);
 
 			console.time('build');
 			var file = new MP4(stream.byteLength);
@@ -280,6 +294,1016 @@
 															flags: 0,
 															entries: IDR
 														}],
+														/*
+															"ctts": [
+                                                            {
+                                                                "version": "0",
+                                                                "flags": "0",
+                                                                "entries": [
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "7200"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "14400"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "7200"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "0"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "14400"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "7200"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "0"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "14400"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "7200"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "0"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "14400"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "7200"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "0"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "14400"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "7200"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "0"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "14400"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "7200"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "0"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "14400"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "7200"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "0"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "14400"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "7200"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "0"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "14400"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "7200"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "0"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "14400"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "7200"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "0"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "14400"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "7200"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "0"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "14400"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "7200"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "0"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "14400"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "7200"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "0"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "14400"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "7200"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "0"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "14400"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "7200"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "0"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "14400"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "7200"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "0"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "14400"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "7200"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "0"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "14400"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "7200"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "0"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "14400"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "7200"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "0"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "14400"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "7200"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "0"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "14400"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "7200"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "0"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "14400"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "7200"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "0"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "14400"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "7200"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "0"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "14400"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "7200"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "0"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "14400"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "7200"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "0"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "14400"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "7200"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "0"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "14400"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "7200"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "0"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "14400"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "7200"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "0"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "14400"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "7200"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "0"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "14400"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "7200"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "0"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "14400"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "7200"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "0"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "14400"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "7200"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "0"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "14400"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "7200"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "0"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "14400"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "7200"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "0"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "14400"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "7200"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "0"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "14400"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "7200"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "0"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "14400"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "7200"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "0"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "14400"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "7200"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "0"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "14400"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "7200"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "0"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "14400"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "7200"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "0"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "14400"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "7200"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "0"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "14400"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "7200"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "0"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "14400"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "7200"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "0"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "14400"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "7200"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "0"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "14400"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "7200"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "0"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "14400"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "7200"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "0"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "14400"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "7200"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "0"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "14400"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "7200"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "0"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "14400"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "7200"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "0"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "14400"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "7200"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "0"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "14400"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "7200"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "0"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "14400"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "7200"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "0"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "14400"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "7200"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "0"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "14400"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "7200"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "0"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "14400"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "7200"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "0"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "14400"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "7200"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "0"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "14400"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "7200"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "0"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "14400"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "7200"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "0"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "14400"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "7200"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "0"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "14400"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "7200"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "0"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "14400"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "7200"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "0"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "14400"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "7200"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "0"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "14400"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "7200"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "0"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "14400"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "7200"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "0"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "14400"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "7200"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "0"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "14400"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "7200"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "0"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "14400"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "7200"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "0"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "14400"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "7200"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "0"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "14400"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "7200"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "0"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "14400"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "7200"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "0"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "14400"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "7200"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "0"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "14400"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "7200"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "0"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "14400"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "7200"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "0"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "10800"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "3600"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "10800"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "3600"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "10800"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "3600"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "10800"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "3600"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "10800"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "3600"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "10800"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "3600"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "10800"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "3600"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "10800"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "3600"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "10800"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "3600"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "10800"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "3600"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "14400"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "7200"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "0"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "10800"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "3600"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "10800"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "3600"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "10800"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "3600"
+                                                                    },
+                                                                    {
+                                                                        "sample_count": "1",
+                                                                        "sample_offset": "7200"
+                                                                    }
+                                                                ]
+                                                            }
+                                                        ],
+                                                        */
 														stsc: [{
 															version: 0,
 															flags: 0,
