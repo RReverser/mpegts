@@ -6,6 +6,7 @@
 	<script src="/jBinary/src/jbinary.js"></script>
 	<script src="mpegts.js"></script>
 	<script src="mp4.js"></script>
+	<script src="pes.js"></script>
 	<script src="h264.js"></script>
 	<style type="text/css">
 		.jsonContainer { color: #733; font-style: italic; word-wrap: break-word; display: block; float: left; width: 45%; margin-right: 2%; overflow-x: scroll; }
@@ -33,7 +34,7 @@
 			})();
 		}
 
-		MPEGTS.loadFrom('chunk-202.ts', function () {
+		MPEGTS.loadFrom('data/chunk-202.ts', function () {
 			console.time('convert');
 
 			console.time('read');
@@ -44,15 +45,6 @@
 			var stream = new jDataView(this.binary.view.byteLength), offset2pts = {};
 			for (var i = 0, length = packets.length; i < length; i++) {
 				var packet = packets[i], adaptation = packet.adaptationField, payload = packet.payload;
-				if (adaptation && adaptation.pcr && packet.pid === 256) {
-					/*
-					hack: let's store PTS temporarily in our own NALU with
-					streamId=0x87 (forbidden_zero_bit=1, nal_ref_idc=0(is not used to reconstruct reference pictures), nal_unit_type=7(SPS))
-					which should not be used according to spec
-					*/
-					stream.writeBytes([0x00, 0x00, 0x01, 0x87]);
-					offset2pts[stream.tell()] = adaptation.pcr.pts;
-				}
 				if (payload && payload._rawStream) {
 					stream.writeBytes(payload._rawStream);
 				}
@@ -60,7 +52,7 @@
 			console.timeEnd('getStream');
 
 			console.time('filter');
-			var original = stream.getBytes(stream.tell(), 0, true, true), accessPoints = [], IDR = [], prevAccessPoint = 0, STTS = [], lastSTTS, prevPTS, ptsDeltaSampleCount = 0, duration = 0;
+			var original = stream.getBytes(stream.tell(), 0, true, true), pesStream = new jBinary(original, PES), samples = [], curSample = {};
 			stream.seek(0);
 			for (var i = 0, start = 0, streamId, length = original.length; i <= length; i++) {
 				if (i === length || (original[i] === 0 && original[i + 1] === 0 && (original[i + 2] === 1 || (original[i + 2] === 0 && original[i + 3] === 1)))) {
@@ -85,49 +77,30 @@
 							}
 							break;
 
-						case 0x87:
-							var pts = offset2pts[start + 1];
-							if (prevPTS !== undefined && pts > prevPTS && ptsDeltaSampleCount > 0) {
-								var deltaPTS = pts - prevPTS;
-								duration += deltaPTS;
-								deltaPTS /= ptsDeltaSampleCount;
-								if (lastSTTS && lastSTTS.sample_delta === deltaPTS) {
-									lastSTTS.sample_count += ptsDeltaSampleCount;
-								} else {
-									STTS.push(lastSTTS = {sample_count: ptsDeltaSampleCount, sample_delta: deltaPTS});
-								}
-								ptsDeltaSampleCount = 0;
-								prevPTS = pts;
-							} else
-							if (prevPTS === undefined) {
-								prevPTS = pts;
+						case 0x09:
+							curSample.offset = stream.tell();
+							samples.push(curSample);
+							curSample = {};
+							// copy all that were not parsed yet and do not have forbidden_zero_bit
+							if (i > start && !(streamId & 0x80)) {
+								stream.writeUint32(i - start);
+								stream.writeBytes(original.slice(start, i));
 							}
 							break;
 
-						case 0x09:
-							ptsDeltaSampleCount++;
-							var pos = stream.tell();
-							if (pos > 0) {
-								accessPoints.push(pos - prevAccessPoint);
-								prevAccessPoint = pos;
-								// copy all that were not parsed yet and do not have forbidden_zero_bit
-								if (i > start && !(streamId & 0x80)) {
-									stream.writeUint32(i - start);
-									stream.writeBytes(original.slice(start, i));
-								}
-							}
+						case 0xE0:
+							try {
+								pesStream.seek(start + 1);
+								var pesHeader = pesStream.read('PESHeader');
+								curSample.pts = pesHeader.pts;
+								curSample.dts = pesHeader.dts || pesHeader.pts;
+							} catch (e) { }
 							break;
 
 						case 0x65:
-							IDR.push(accessPoints.length + 1);
+							curSample.isIDR = true;
 
 						default:
-							if (streamId === 0x01 || streamId === 0x41 || streamId === 0x65) {
-								var sliceHeader = new jBinary(new jDataView(original, start + 1, i - start - 1), H264);
-								sliceHeader.read('ExpGolomb');
-								var frameType = ['P', 'B', 'I', 'SP', 'SI'][sliceHeader.read('ExpGolomb') % 5];
-								console.log(frameType);
-							}
 							// copy all that were not parsed yet and do not have forbidden_zero_bit
 							if (i > start && !(streamId & 0x80)) {
 								stream.writeUint32(i - start);
@@ -141,6 +114,9 @@
 				}
 			}
 			console.timeEnd('filter');
+
+			// TODO: fix starting from here
+			return console.log(samples);
 
 			if (prevPTS !== undefined && ptsDeltaSampleCount > 0) {
 				var deltaPTS = pts - prevPTS;
