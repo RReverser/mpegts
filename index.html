@@ -54,7 +54,7 @@
 			var original = stream.getBytes(stream.tell(), 0, true, true), pesStream = new jBinary(original, PES), audioStream = new jDataView(stream.byteLength), samples = [], curSample = {};
 			stream.seek(0);
 			for (var i = 0, start = 0, streamId, length = original.length; i <= length; i++) {
-				if (i === length || (original[i] === 0 && original[i + 1] === 0 && (original[i + 2] === 1 || (original[i + 2] === 0 && original[i + 3] === 1)))) {
+				if (i === length || (original[i] === 0 && original[i + 1] === 0 && original[i + 2] === 1)) {
 					switch (streamId) {
 						case 0x67:
 							if (!sps) {
@@ -105,8 +105,13 @@
 
 						case 0x65:
 							curSample.isIDR = true;
-							/* falls through */
+
 						default:
+							if (streamId === 0x01 || streamId === 0x41 || streamId === 0x65) {
+								var sliceHeader = pesStream.view.slice(start + 1, i).toBinary(H264);
+								sliceHeader.read('ExpGolomb');
+								curSample.frameType = ['P', 'B', 'I', 'SP', 'SI'][sliceHeader.read('ExpGolomb') % 5];
+							}
 							// copy all that were not parsed yet and do not have forbidden_zero_bit
 							if (i > start && !(streamId & 0x80)) {
 								stream.writeUint32(i - start);
@@ -114,26 +119,39 @@
 							}
 							break;
 					}
-					i += original[i + 2] ? 3 : 4;
-					start = i;
+					start = i += 3;
 					streamId = original[i];
+				}
+			}
+
+			samples.push({offset: stream.tell()});
+
+			var sizes = [], dtsDiffs = [], accessIndexes = [], pts_dts_Diffs = [], current = samples[0], frameRate = {sum: 0, count: 0};
+			for (var i = 0, length = samples.length - 1; i < length; i++) {
+				var next = samples[i + 1];
+				sizes.push(next.offset - current.offset);
+				var dtsDiff = next.dts - current.dts;
+				if (dtsDiff) {
+					dtsDiffs.push(dtsDiff);
+					frameRate.sum += dtsDiff;
+					frameRate.count++;
+				} else {
+					dtsDiffs.length++;
+				}
+				if (current.isIDR) accessIndexes.push(i);
+				pts_dts_Diffs.push(samples[i].dtsFix = current.pts - current.dts);
+				current = next;
+			}
+			frameRate = frameRate.sum / frameRate.count;
+			for (var i = 0, length = dtsDiffs.length; i < length; i++) {
+				if (dtsDiffs[i] === undefined) {
+					dtsDiffs[i] = frameRate;
+					samples[i + 1].dts = samples[i].dts + frameRate;
 				}
 			}
 			console.timeEnd('filter');
 
-			samples.push({offset: stream.tell()});
-
-			var sizes = [], ptsDiffs = [], accessIndexes = [], dtsFixes = [], current = samples[0];
-			for (var i = 0, length = samples.length - 1; i < length; i++) {
-				var next = samples[i + 1];
-				sizes.push(next.offset - current.offset);
-				ptsDiffs.push(next.dts - current.dts);
-				if (current.isIDR) accessIndexes.push(i);
-				dtsFixes.push(current.pts - current.dts);
-				current = next;
-			}
-
-			return console.log(new jBinary(audioStream.slice(0, audioStream.tell())).toURL(), samples, sizes, ptsDiffs, accessIndexes, dtsFixes);
+			return console.log(audioStream.slice(0, audioStream.tell()).toBinary().toURL(), samples.slice(0, -1), sizes, dtsDiffs, accessIndexes, pts_dts_Diffs);
 
 			console.time('build');
 			var file = new MP4(stream.byteLength);
