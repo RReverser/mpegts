@@ -54,9 +54,9 @@ var H264 = {
 			level_idc: 'uint8',
 			seq_parameter_set_id: 'ExpGolomb',
 		},
-		['if', function () { return [100, 110, 122, 244, 44, 83, 86, 118].indexOf(this.binary.getContext().profile_idc) >= 0 }, {
+		['if', function (context) { return [100, 110, 122, 244, 44, 83, 86, 118].indexOf(context.profile_idc) >= 0 }, {
 			chroma_format: ['enum', 'ExpGolomb', ['MONO', 'YUV420', 'YUV422', 'YUV444']],
-			separate_color_plane_flag: ['if', function () { return this.binary.getContext().chroma_format === 'YUV444' }, 1],
+			separate_color_plane_flag: ['if', function (context) { return context.chroma_format === 'YUV444' }, 1],
 			bit_depth_luma_minus8: 'ExpGolomb',
 			bit_depth_chroma_minus8: 'ExpGolomb',
 			qpprime_y_zero_transform_bypass_flag: 1,
@@ -70,7 +70,7 @@ var H264 = {
 			pic_order_cnt_type: 'ExpGolomb',
 			pic_order: ['if_not', 'pic_order_cnt_type', {log2_max_pic_order_cnt_lsb_minus4: 'ExpGolomb'}, [
 				'if',
-				function () { return this.binary.getContext().pic_order_cnt_type === 1 },
+				function (context) { return context.pic_order_cnt_type === 1 },
 				{
 					delta_pic_order_always_zero_flag: 1,
 					offset_for_non_ref_pic: ['ExpGolomb', true],
@@ -78,9 +78,9 @@ var H264 = {
 					_num_ref_frames_in_pic_order_cnt_cycle: jBinary.Property(
 						null,
 						function () { return this.binary.read('ExpGolomb') },
-						function () { this.binary.write('ExpGolomb', this.binary.getContext().offset_for_ref_frame.length) }
+						function (value, context) { this.binary.write('ExpGolomb', context.offset_for_ref_frame.length) }
 					),
-					offset_for_ref_frame: ['array', ['ExpGolomb', true], function () { return this.binary.getContext()._num_ref_frames_in_pic_order_cnt_cycle }]
+					offset_for_ref_frame: ['array', ['ExpGolomb', true], function (context) { return context._num_ref_frames_in_pic_order_cnt_cycle }]
 				}
 			]],
 			max_num_ref_frames: 'ExpGolomb',

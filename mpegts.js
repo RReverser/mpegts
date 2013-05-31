@@ -26,8 +26,8 @@ var MPEGTS = jBinary.FileFormat({
 		function () {
 			return this.binary.read(1);
 		},
-		function () {
-			this.binary.write(1, (this.dependentField in this.binary.getContext() ? 1 : 0));
+		function (value, context) {
+			this.binary.write(1, (this.dependentField in context ? 1 : 0));
 		}
 	),
 
@@ -43,7 +43,7 @@ var MPEGTS = jBinary.FileFormat({
 
 	AdaptationField: {
 		length: 'uint8',
-		_endOf: function () { return this.binary.tell() + this.binary.getContext().length },
+		_endOf: function (context) { return this.binary.tell() + context.length },
 		discontinuity: 1,
 		randomAccess: 1,
 		priority: 1,
@@ -57,7 +57,7 @@ var MPEGTS = jBinary.FileFormat({
 		spliceCountdown: ['FlagDependent', '_hasSplicingPoint', 'uint8'],
 		privateData: ['FlagDependent', '_hasTransportPrivateData', 'Field'],
 		extension: ['FlagDependent', '_hasExtension', 'Field'],
-		_toEnd: function () { this.binary.seek(this.binary.getContext()._endOf) }
+		_toEnd: function (context) { this.binary.seek(context._endOf) }
 	},
 
 	ES: {
@@ -84,8 +84,8 @@ var MPEGTS = jBinary.FileFormat({
 
 			_dataLength: function () { return this.binary.getContext(1)._sectionLength - 9 },
 
-			data: jBinary.Property(null, function () {
-				var data, file = this.binary.getContext(3), header = this.binary.getContext(), dataLength = header._dataLength;
+			data: jBinary.Property(null, function (header) {
+				var data, file = this.binary.getContext(3), dataLength = header._dataLength;
 
 				switch (this.binary.getContext(1).tableId) {
 					case 'PAT':
@@ -147,7 +147,7 @@ var MPEGTS = jBinary.FileFormat({
 
 			crc32: 'uint32'
 		},
-		['blob', function () { return this.binary.getContext()._sectionLength }]
+		['blob', function (context) { return context._sectionLength }]
 	]],
 
 	Packet: {
@@ -169,8 +169,8 @@ var MPEGTS = jBinary.FileFormat({
 
 		payload: ['FlagDependent', '_hasPayload', jBinary.Template(
 			null,
-			function () {
-				var pid = this.binary.getContext().pid, file = this.binary.getContext(1);
+			function (context) {
+				var pid = context.pid, file = this.binary.getContext(1);
 				if (pid < 2 || pid in file.pat) {
 					return 'PrivateSection';
 				}
@@ -180,7 +180,7 @@ var MPEGTS = jBinary.FileFormat({
 			}
 		)],
 
-		_toEnd: function () { this.binary.seek(this.binary.getContext()._startof + 188) }
+		_toEnd: function (context) { this.binary.seek(context._startof + 188) }
 	},
 
 	File: jBinary.Property(

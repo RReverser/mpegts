@@ -28,8 +28,8 @@ var MP4 = jBinary.FileFormat({
 			function () {
 				return this.binary.read('uint32');
 			},
-			function () {
-				var size = this.binary.getContext().size;
+			function (value, context) {
+				var size = context.size;
 				if (!size) {
 					return this.binary.write('uint32', 0);
 				}
@@ -39,8 +39,8 @@ var MP4 = jBinary.FileFormat({
 		type: 'ShortName',
 		size: jBinary.Property(
 			null,
-			function () {
-				var _size = this.binary.getContext()._size;
+			function (context) {
+				var _size = context._size;
 				switch (_size) {
 					case 0: return this.binary.view.byteLength - this.binary.tell() + 8;
 					case 1: return this.binary.read('uint64');
@@ -55,8 +55,7 @@ var MP4 = jBinary.FileFormat({
 		),
 		_end: jBinary.Property(
 			null,
-			function () {
-				var context = this.binary.getContext();
+			function (context) {
 				return context._begin + context.size;
 			}
 		)
@@ -280,8 +279,8 @@ var MP4 = jBinary.FileFormat({
 	hdlr: ['extend', 'FullBox', {
 		_reserved: ['skip', 4],
 		handler_type: ['string', 4],
-		_set_handler_type: function () {
-			this.binary.getContext(atomFilter('trak'))._handler_type = this.binary.getContext().handler_type;
+		_set_handler_type: function (context) {
+			this.binary.getContext(atomFilter('trak'))._handler_type = context.handler_type;
 		},
 		_reserved2: ['skip', 12],
 		name: 'string'
@@ -509,13 +508,13 @@ var MP4 = jBinary.FileFormat({
 	stsz: ['extend', 'FullBox', {
 		sample_size: 'uint32',
 		sample_count: 'uint32',
-		_sample_count_to_stbl: function () {
-			this.binary.getContext(atomFilter('stbl'))._sample_count = this.binary.getContext().sample_count;
+		_sample_count_to_stbl: function (context) {
+			this.binary.getContext(atomFilter('stbl'))._sample_count = context.sample_count;
 		},
 		sample_sizes: [
 			'if_not',
 			['sample_size'],
-			['array', 'uint32', function () { return this.binary.getContext().sample_count }]
+			['array', 'uint32', function (context) { return context.sample_count }]
 		]
 	}],
 
@@ -523,13 +522,13 @@ var MP4 = jBinary.FileFormat({
 		_reserved: ['skip', 3],
 		field_size: 'uint8',
 		sample_count: 'uint32',
-		_sample_count_to_stbl: function () {
-			this.binary.getContext(atomFilter('stbl'))._sample_count = this.binary.getContext().sample_count;
+		_sample_count_to_stbl: function (context) {
+			this.binary.getContext(atomFilter('stbl'))._sample_count = context.sample_count;
 		},
 		sample_sizes: [
 			'array',
-			jBinary.Template(null, function () { return this.binary.getContext().field_size }),
-			function () { return this.binary.getContext().sample_count }
+			jBinary.Template(null, function (context) { return context.field_size }),
+			function (context) { return context.sample_count }
 		]
 	}],
 

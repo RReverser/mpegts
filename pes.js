@@ -6,8 +6,8 @@ var PES = {
 		function () {
 			return this.binary.read(1);
 		},
-		function () {
-			this.binary.write(1, (this.dependentField in this.binary.getContext() ? 1 : 0));
+		function (value, context) {
+			this.binary.write(1, (this.dependentField in context ? 1 : 0));
 		}
 	),
 
@@ -64,10 +64,10 @@ var PES = {
 		_hasPESCRC: ['Flag', 'pesCRC'],
 		_hasExtension: ['Flag', 'extension'],
 		dataLength: 'uint8',
-		_end: function () { return this.binary.tell() + this.binary.getContext().dataLength },
+		_end: function (context) { return this.binary.tell() + context.dataLength },
 		pts: ['FlagDependent', '_hasPTS', ['if', ['_hasDTS'], ['PESTimeStamp', 3], ['PESTimeStamp', 2]]],
 		dts: ['FlagDependent', '_hasDTS', ['PESTimeStamp', 1]],
-		_toEnd: function () { this.binary.seek(this.binary.getContext()._end) }
+		_toEnd: function (context) { this.binary.seek(context._end) }
 	}
 };
 
