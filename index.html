@@ -121,6 +121,8 @@
 			}
 			console.timeEnd('filter');
 
+			samples.push({offset: stream.tell()});
+
 			var sizes = [], ptsDiffs = [], accessIndexes = [], dtsFixes = [], current = samples[0];
 			for (var i = 0, length = samples.length - 1; i < length; i++) {
 				var next = samples[i + 1];
