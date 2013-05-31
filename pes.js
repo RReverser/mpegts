@@ -64,8 +64,10 @@ var PES = {
 		_hasPESCRC: ['Flag', 'pesCRC'],
 		_hasExtension: ['Flag', 'extension'],
 		dataLength: 'uint8',
+		_end: function () { return this.binary.tell() + this.binary.getContext().dataLength },
 		pts: ['FlagDependent', '_hasPTS', ['if', ['_hasDTS'], ['PESTimeStamp', 3], ['PESTimeStamp', 2]]],
-		dts: ['FlagDependent', '_hasDTS', ['PESTimeStamp', 1]]
+		dts: ['FlagDependent', '_hasDTS', ['PESTimeStamp', 1]],
+		_toEnd: function () { this.binary.seek(this.binary.getContext()._end) }
 	}
 };
 

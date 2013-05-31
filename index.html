@@ -27,8 +27,7 @@
 					timeStarts[id] = nowHost.now();
 				};
 				console.timeEnd = function (id) {
-					console.log(id + ': ' + (nowHost.now() - timeStarts[id]) + ' ms');
-					document.title = id + ': ' + (nowHost.now() - timeStarts[id]) + ' ms';
+					console.log(document.title = id + ': ' + (nowHost.now() - timeStarts[id]) + ' ms');
 					delete timeStarts[id];
 				};
 			})();
@@ -42,7 +41,7 @@
 			console.timeEnd('read');
 
 			console.time('getStream');
-			var stream = new jDataView(this.binary.view.byteLength), offset2pts = {};
+			var stream = new jDataView(this.binary.view.byteLength);
 			for (var i = 0, length = packets.length; i < length; i++) {
 				var packet = packets[i], adaptation = packet.adaptationField, payload = packet.payload;
 				if (payload && payload._rawStream) {
@@ -52,7 +51,7 @@
 			console.timeEnd('getStream');
 
 			console.time('filter');
-			var original = stream.getBytes(stream.tell(), 0, true, true), pesStream = new jBinary(original, PES), samples = [], curSample = {};
+			var original = stream.getBytes(stream.tell(), 0, true, true), pesStream = new jBinary(original, PES), audioStream = new jDataView(stream.byteLength), samples = [], curSample = {};
 			stream.seek(0);
 			for (var i = 0, start = 0, streamId, length = original.length; i <= length; i++) {
 				if (i === length || (original[i] === 0 && original[i + 1] === 0 && (original[i + 2] === 1 || (original[i + 2] === 0 && original[i + 3] === 1)))) {
@@ -88,6 +87,13 @@
 							}
 							break;
 
+						case 0xC0:
+							pesStream.seek(start + 1);
+							var audioLength = pesStream.read('PESHeader').length;
+							audioLength += -(pesStream.tell() - (start + 1)) + 2;
+							audioStream.writeBytes(pesStream.read(['blob', audioLength]));
+							break;
+
 						case 0xE0:
 							try {
 								pesStream.seek(start + 1);
@@ -99,7 +105,7 @@
 
 						case 0x65:
 							curSample.isIDR = true;
-
+							/* falls through */
 						default:
 							// copy all that were not parsed yet and do not have forbidden_zero_bit
 							if (i > start && !(streamId & 0x80)) {
@@ -115,21 +121,17 @@
 			}
 			console.timeEnd('filter');
 
-			// TODO: fix starting from here
-			return console.log(samples);
-
-			if (prevPTS !== undefined && ptsDeltaSampleCount > 0) {
-				var deltaPTS = pts - prevPTS;
-				duration += deltaPTS;
-				deltaPTS /= ptsDeltaSampleCount;
-				if (deltaPTS === 0 || (lastSTTS && lastSTTS.sample_delta === deltaPTS)) {
-					lastSTTS.sample_count += ptsDeltaSampleCount;
-				} else {
-					STTS.push(lastSTTS = {sample_count: ptsDeltaSampleCount, sample_delta: deltaPTS});
-				}
-				ptsDeltaSampleCount = 0;
+			var sizes = [], ptsDiffs = [], accessIndexes = [], dtsFixes = [], current = samples[0];
+			for (var i = 0, length = samples.length - 1; i < length; i++) {
+				var next = samples[i + 1];
+				sizes.push(next.offset - current.offset);
+				ptsDiffs.push(next.dts - current.dts);
+				if (current.isIDR) accessIndexes.push(i);
+				dtsFixes.push(current.pts - current.dts);
+				current = next;
 			}
-			console.log(STTS, duration / 90000);
+
+			return console.log(new jBinary(audioStream.slice(0, audioStream.tell())).toURL(), samples, sizes, ptsDiffs, accessIndexes, dtsFixes);
 
 			console.time('build');
 			var file = new MP4(stream.byteLength);
