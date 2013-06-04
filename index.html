@@ -15,7 +15,7 @@
 </head>
 <body>
 	<video id="video" controls>
-		<source id="source" type="video/mp4"></source>
+		<source id="source" type="video/mp4" />
 	</video>
 	<a id="url">Download</a>
 
@@ -33,7 +33,7 @@
 			})();
 		}
 
-		MPEGTS.loadFrom('data/chunk-202.ts', function () {
+		MPEGTS.loadFrom('data/sample.ts', function () {
 			console.time('convert');
 
 			console.time('read');
@@ -51,7 +51,7 @@
 			console.timeEnd('getStream');
 
 			console.time('filter');
-			var original = stream.getBytes(stream.tell(), 0, true, true), pesStream = new jBinary(original, PES), audioStream = new jDataView(stream.byteLength), samples = [], curSample = {};
+			var original = stream.getBytes(stream.tell(), 0, true, true), pesStream = new jBinary(original, PES), audioStream = new jBinary(stream.byteLength), samples = [], curSample = {};
 			stream.seek(0);
 			for (var i = 0, start = 0, streamId, length = original.length; i <= length; i++) {
 				if (i === length || (original[i] === 0 && original[i + 1] === 0 && original[i + 2] === 1)) {
@@ -91,7 +91,7 @@
 							pesStream.seek(start + 1);
 							var audioLength = pesStream.read('PESHeader').length;
 							audioLength += -(pesStream.tell() - (start + 1)) + 2;
-							audioStream.writeBytes(pesStream.read(['blob', audioLength]));
+							audioStream.write('blob', pesStream.read(['blob', audioLength]));
 							break;
 
 						case 0xE0:
@@ -142,13 +142,13 @@
 					dtsDiffs.length++;
 				}
 				if (current.isIDR) accessIndexes.push(i);
-				pts_dts_Diffs.push({sample_count: 1, sample_offset: current.dtsFix = current.pts - current.dts});
+				pts_dts_Diffs.push({first_chunk: pts_dts_Diffs.length + 1, sample_count: 1, sample_offset: current.dtsFix = current.pts - current.dts});
 				current = next;
 			}
 			frameRate = frameRate.sum / frameRate.count;
 			for (var i = 0, length = dtsDiffs.length; i < length; i++) {
 				if (dtsDiffs[i] === undefined) {
-					dtsDiffs[i] = {sample_count: 1, sample_delta: frameRate};
+					dtsDiffs[i] = {first_chunk: i + 1, sample_count: 1, sample_delta: frameRate};
 					duration += frameRate;
 					//samples[i + 1].dts = samples[i].dts + frameRate;
 				}
@@ -161,8 +161,32 @@
 				}
 			}
 			if (dtsDiffsSame) {
-				dtsDiffs = [{sample_count: sizes.length, sample_delta: dtsDiffs[0].sample_delta}];
+				dtsDiffs = [{first_chunk: 1, sample_count: sizes.length, sample_delta: dtsDiffs[0].sample_delta}];
 			}
+
+			var audioStart = stream.tell(), audioSize = audioStream.tell(), audioSizes = [];
+			stream.writeBytes(audioStream.read(['blob', audioSize], 0));
+			audioStream.seek(0);
+			while (audioStream.tell() < audioSize) {
+				var header = audioStream.read({
+					_start: function () { return this.binary.tell() },
+					_syncWord: ['const', 12, 0xfff, true],
+					version: ['enum', 1, ['mpeg4', 'mpeg-2']],
+					layer: ['const', 2, 0],
+					isProtectionAbsent: 1,
+					profile: 2, // http://wiki.multimedia.cx/index.php?title=MPEG-4_Audio#Audio_Object_Types minus one
+					samplingFreqIndex: 4, // http://wiki.multimedia.cx/index.php?title=MPEG-4_Audio#Sampling_Frequencies
+					_privateStream: ['const', 1, 0],
+					channelConfig: 3, // http://wiki.multimedia.cx/index.php?title=MPEG-4_Audio#Channel_Configurations
+					_reserved: 4, // originality, home, copyrighted, copyright start bits
+					frameLength: 13,
+					bufferFullness: 11,
+					aacFramesCountMinusOne: 2,
+					_toEnd: function (context) { this.binary.seek(context._start + context.frameLength) }
+				});
+				audioSizes.push(header.frameLength);
+			}
+
 			console.timeEnd('filter');
 
 			// return console.log(audioStream.slice(0, audioStream.tell()).toBinary().toURL(), samples.slice(0, -1), sizes, dtsDiffs, accessIndexes, pts_dts_Diffs);
@@ -194,152 +218,274 @@
 							},
 							next_track_ID: 2
 						}],
-						trak: [{
-							atoms: {
-								tkhd: [{
-									version: 0,
-									flags: 15,
-									track_ID: 1,
-									duration: duration,
-									layer: 0,
-									alternate_group: 0,
-									volume: 1,
-									matrix: {
-										a: 1, b: 0, x: 0,
-										c: 0, d: 1, y: 0,
-										u: 0, v: 0, w: 1
-									},
-									dimensions: {
-										horz: width,
-										vert: height
-									}
-								}],
-								edts: [{
-									atoms: {
-										elst: [{
-											version: 0,
-											flags: 0,
-											entries: [{
-												segment_duration: duration,
-												media_time: 0,
-												media_rate: 1
-											}]
-										}]
-									}
-								}],
-								mdia: [{
-									atoms: {
-										mdhd: [{
-											version: 0,
-											flags: 0,
-											timescale: 90000,
-											duration: duration,
-											lang: 'und'
-										}],
-										hdlr: [{
-											version: 0,
-											flags: 0,
-											handler_type: 'vide',
-											name: 'VideoHandler'
-										}],
-										minf: [{
-											atoms: {
-												vmhd: [{
-													version: 0,
-													flags: 1,
-													graphicsmode: 0,
-													opcolor: {r: 0, g: 0, b: 0}
-												}],
-												dinf: [{
-													atoms: {
-														dref: [{
-															version: 0,
-															flags: 0,
-															entries: [{
-																type: 'url ',
-																version: 0,
-																flags: 1,
-																location: ''
-															}]
-														}]
-													}
-												}],
-												stbl: [{
-													atoms: {
-														stsd: [{
-															version: 0,
-															flags: 0,
-															entries: [{
-																type: 'avc1',
-																data_reference_index: 1,
-																dimensions: {
-																	horz: width,
-																	vert: height
-																},
-																resolution: {
-																	horz: 72,
-																	vert: 72
-																},
-																frame_count: 1,
-																compressorname: '',
-																depth: 24,
-																atoms: {
-																	avcC: [{
-																		version: 1,
-																		profileIndication: spsInfo.profile_idc,
-																		profileCompatibility: parseInt(spsInfo.constraint_set_flags.join(''), 2),
-																		levelIndication: spsInfo.level_idc,
-																		lengthSizeMinusOne: 3,
-																		seqParamSets: [sps],
-																		pictParamSets: [pps]
-																	}]
-																}
-															}]
-														}],
-														stts: [{
-															version: 0,
-															flags: 0,
-															entries: dtsDiffs
-														}],
-														stss: [{
-															version: 0,
-															flags: 0,
-															entries: accessIndexes
-														}],
-														ctts: [{
-															version: 0,
-															flags: 0,
-															entries: pts_dts_Diffs
-														}],
-														stsc: [{
-															version: 0,
-															flags: 0,
-															entries: [{
-																first_chunk: 1,
-																samples_per_chunk: sizes.length,
-																sample_description_index: 1
-															}]
-														}],
-														stsz: [{
-															version: 0,
-															flags: 0,
-															sample_size: 0,
-															sample_count: sizes.length,
-															sample_sizes: sizes
-														}],
-														stco: [{
-															version: 0,
-															flags: 0,
-															entries: [0x28]
-														}]
-													}
+						trak: [
+							{
+								atoms: {
+									tkhd: [{
+										version: 0,
+										flags: 15,
+										track_ID: 1,
+										duration: duration,
+										layer: 0,
+										alternate_group: 0,
+										volume: 1,
+										matrix: {
+											a: 1, b: 0, x: 0,
+											c: 0, d: 1, y: 0,
+											u: 0, v: 0, w: 1
+										},
+										dimensions: {
+											horz: width,
+											vert: height
+										}
+									}],
+									edts: [{
+										atoms: {
+											elst: [{
+												version: 0,
+												flags: 0,
+												entries: [{
+													segment_duration: duration,
+													media_time: 0,
+													media_rate: 1
 												}]
-											}
-										}]
-									}
-								}]
+											}]
+										}
+									}],
+									mdia: [{
+										atoms: {
+											mdhd: [{
+												version: 0,
+												flags: 0,
+												timescale: 90000,
+												duration: duration,
+												lang: 'und'
+											}],
+											hdlr: [{
+												version: 0,
+												flags: 0,
+												handler_type: 'vide',
+												name: 'VideoHandler'
+											}],
+											minf: [{
+												atoms: {
+													vmhd: [{
+														version: 0,
+														flags: 1,
+														graphicsmode: 0,
+														opcolor: {r: 0, g: 0, b: 0}
+													}],
+													dinf: [{
+														atoms: {
+															dref: [{
+																version: 0,
+																flags: 0,
+																entries: [{
+																	type: 'url ',
+																	version: 0,
+																	flags: 1,
+																	location: ''
+																}]
+															}]
+														}
+													}],
+													stbl: [{
+														atoms: {
+															stsd: [{
+																version: 0,
+																flags: 0,
+																entries: [{
+																	type: 'avc1',
+																	data_reference_index: 1,
+																	dimensions: {
+																		horz: width,
+																		vert: height
+																	},
+																	resolution: {
+																		horz: 72,
+																		vert: 72
+																	},
+																	frame_count: 1,
+																	compressorname: '',
+																	depth: 24,
+																	atoms: {
+																		avcC: [{
+																			version: 1,
+																			profileIndication: spsInfo.profile_idc,
+																			profileCompatibility: parseInt(spsInfo.constraint_set_flags.join(''), 2),
+																			levelIndication: spsInfo.level_idc,
+																			lengthSizeMinusOne: 3,
+																			seqParamSets: [sps],
+																			pictParamSets: [pps]
+																		}]
+																	}
+																}]
+															}],
+															stts: [{
+																version: 0,
+																flags: 0,
+																entries: dtsDiffs
+															}],
+															stss: [{
+																version: 0,
+																flags: 0,
+																entries: accessIndexes
+															}],
+															ctts: [{
+																version: 0,
+																flags: 0,
+																entries: pts_dts_Diffs
+															}],
+															stsc: [{
+																version: 0,
+																flags: 0,
+																entries: [{
+																	first_chunk: 1,
+																	samples_per_chunk: sizes.length,
+																	sample_description_index: 1
+																}]
+															}],
+															stsz: [{
+																version: 0,
+																flags: 0,
+																sample_size: 0,
+																sample_count: sizes.length,
+																sample_sizes: sizes
+															}],
+															stco: [{
+																version: 0,
+																flags: 0,
+																entries: [0x28]
+															}]
+														}
+													}]
+												}
+											}]
+										}
+									}]
+								}
+							},
+							{
+								atoms: {
+									tkhd: [{
+										version: 0,
+										flags: 15,
+										track_ID: 2,
+										duration: duration,
+										layer: 0,
+										alternate_group: 1,
+										volume: 1,
+										matrix: {
+											a: 1, b: 0, x: 0,
+											c: 0, d: 1, y: 0,
+											u: 0, v: 0, w: 1
+										},
+										dimensions: {
+											horz: 0,
+											vert: 0
+										}
+									}],
+									edts: [{
+										atoms: {
+											elst: [{
+												version: 0,
+												flags: 0,
+												entries: [{
+													segment_duration: duration,
+													media_time: 0,
+													media_rate: 1
+												}]
+											}]
+										}
+									}],
+									mdia: [{
+										atoms: {
+											mdhd: [{
+												version: 0,
+												flags: 0,
+												timescale: 22050,
+												duration: duration / 90000 * 22050,
+												lang: 'eng'
+											}],
+											hdlr: [{
+												version: 0,
+												flags: 0,
+												handler_type: 'soun',
+												name: 'SoundHandler'
+											}],
+											minf: [{
+												atoms: {
+													smhd: [{
+														version: 0,
+														flags: 0,
+														balance: 0
+													}],
+													dinf: [{
+														atoms: {
+															dref: [{
+																version: 0,
+																flags: 0,
+																entries: [{
+																	type: 'url ',
+																	version: 0,
+																	flags: 1,
+																	location: ''
+																}]
+															}]
+														}
+													}],
+													stbl: [{
+														atoms: {
+															stsd: [{
+																version: 0,
+																flags: 0,
+																entries: [{
+																	type: 'mp4a',
+																	data_reference_index: 1,
+																	channelcount: 2,
+																	samplesize: 16,
+																	samplerate: 22050,
+																	_rawData: []
+																}]
+															}],
+															stts: [{
+																version: 0,
+																flags: 0,
+																entries: [{
+																	sample_count: audioSizes.length,
+																	sample_delta: 2048
+																}]
+															}],
+															stsc: [{
+																version: 0,
+																flags: 0,
+																entries: [{
+																	first_chunk: 1,
+																	samples_per_chunk: audioSizes.length,
+																	sample_description_index: 1
+																}]
+															}],
+															stsz: [{
+																version: 0,
+																flags: 0,
+																sample_size: 0,
+																sample_count: audioSizes.length,
+																sample_sizes: audioSizes
+															}],
+															stco: [{
+																version: 0,
+																flags: 0,
+																entries: [0x28 + audioStart]
+															}]
+														}
+													}]
+												}
+											}]
+										}
+									}]
+								}
 							}
-						}]
+						]
 					}
 				}]
 			});
