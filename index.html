@@ -164,7 +164,7 @@
 				dtsDiffs = [{first_chunk: 1, sample_count: sizes.length, sample_delta: dtsDiffs[0].sample_delta}];
 			}
 
-			var audioStart = stream.tell(), audioSize = audioStream.tell(), audioSizes = [], isHeaderWritten = false, audioHeader;
+			var audioStart = stream.tell(), audioSize = audioStream.tell(), audioSizes = [], audioHeader;
 			audioStream.seek(0);
 			while (audioStream.tell() < audioSize) {
 				audioHeader = audioStream.read({
@@ -183,14 +183,12 @@
 					aacFramesCountMinusOne: 2,
 					data: ['blob', function (context) { return context.frameLength - (this.binary.tell() - context._start) }]
 				});
-				audioSizes.push(isHeaderWritten ? audioHeader.data.length : audioHeader.frameLength);
-				stream.writeBytes(isHeaderWritten ? audioHeader.data : audioStream.read(['blob', audioHeader.frameLength], audioHeader._start));
+				audioSizes.push(audioHeader.data.length);
+				stream.writeBytes(audioHeader.data);
 				isHeaderWritten = true;
 			}
 
 			console.timeEnd('filter');
-
-			// return console.log(audioStream.slice(0, audioStream.tell()).toBinary().toURL(), samples.slice(0, -1), sizes, dtsDiffs, accessIndexes, pts_dts_Diffs);
 
 			console.time('build');
 			var file = new MP4(stream.byteLength);
@@ -404,8 +402,8 @@
 											mdhd: [{
 												version: 0,
 												flags: 0,
-												timescale: 22050,
-												duration: duration / 90000 * 22050,
+												timescale: 90000,
+												duration: duration,
 												lang: 'eng'
 											}],
 											hdlr: [{
@@ -466,7 +464,7 @@
 																					stream_type: 5,
 																					upstream_flag: 0,
 																					buffer_size: 0,
-																					maxBitrate: 31402,
+																					maxBitrate: 31395,
 																					avgBitrate: 31395
 																				},
 																				{
@@ -474,7 +472,7 @@
 																					ext_type: 128,
 																					length: 2,
 																					audio_profile: 2,
-																					sampling_freq: 44100,
+																					sampling_freq: 11025,
 																					channelConfig: 2,
 																					frameLength: 1024
 																				},
@@ -494,7 +492,7 @@
 																flags: 0,
 																entries: [{
 																	sample_count: audioSizes.length,
-																	sample_delta: 2048
+																	sample_delta: duration / audioSizes.length
 																}]
 															}],
 															stsc: [{
