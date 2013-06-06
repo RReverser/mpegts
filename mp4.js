@@ -705,7 +705,8 @@ var MP4 = jBinary.FileFormat({
 							}
 						}
 					),
-					channelConfig: 4,
+					channelConfig: 3,
+					_NON_SPECIFICATION_HACK_: 1,
 					frameLength: ['enum', 1, [1024, 960]],
 					dependsOnCoreCoder: 1,
 					extensionFlag: 1

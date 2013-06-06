@@ -185,8 +185,8 @@
 				});
 				audioSizes.push(audioHeader.data.length);
 				stream.writeBytes(audioHeader.data);
-				isHeaderWritten = true;
 			}
+			console.log(audioHeader);
 
 			console.timeEnd('filter');
 
@@ -473,8 +473,7 @@
 																					length: 2,
 																					audio_profile: 2,
 																					sampling_freq: 11025,
-																					channelConfig: 2,
-																					frameLength: 1024
+																					channelConfig: 2
 																				},
 																				{
 																					descriptor_type: 6,
