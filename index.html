@@ -173,8 +173,8 @@
 					version: ['enum', 1, ['mpeg-4', 'mpeg-2']],
 					layer: ['const', 2, 0],
 					isProtectionAbsent: 1,
-					profile: 2, // http://wiki.multimedia.cx/index.php?title=MPEG-4_Audio#Audio_Object_Types minus one
-					samplingFreqIndex: 4, // http://wiki.multimedia.cx/index.php?title=MPEG-4_Audio#Sampling_Frequencies
+					profileMinusOne: 2, // http://wiki.multimedia.cx/index.php?title=MPEG-4_Audio#Audio_Object_Types minus one
+					samplingFreq: ['enum', 4, [96000, 88200, 64000, 48000, 44100, 32000, 24000, 22050, 16000, 12000, 11025, 8000, 7350]], // http://wiki.multimedia.cx/index.php?title=MPEG-4_Audio#Sampling_Frequencies
 					_privateStream: 1,
 					channelConfig: 3, // http://wiki.multimedia.cx/index.php?title=MPEG-4_Audio#Channel_Configurations
 					_reserved: 4, // originality, home, copyrighted, copyright start bits
@@ -460,8 +460,8 @@
 																					descriptor_type: 4,
 																					ext_type: 128,
 																					length: 20,
-																					type: 64,
-																					stream_type: 5,
+																					type: 'mpeg4_audio',
+																					stream_type: 'audio',
 																					upstream_flag: 0,
 																					buffer_size: 0,
 																					maxBitrate: 31395,
@@ -471,9 +471,9 @@
 																					descriptor_type: 5,
 																					ext_type: 128,
 																					length: 2,
-																					audio_profile: 2,
-																					sampling_freq: 11025,
-																					channelConfig: 2
+																					audio_profile: audioHeader.profileMinusOne + 1,
+																					sampling_freq: audioHeader.samplingFreq,
+																					channelConfig: audioHeader.channelConfig
 																				},
 																				{
 																					descriptor_type: 6,
