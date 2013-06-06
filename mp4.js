@@ -408,7 +408,7 @@ var MP4 = jBinary.FileFormat({
 		samplesize: 'uint16',
 		_reserved2: ['skip', 4],
 		samplerate: 'Rate'
-	}, 'RawData'],
+	}, 'ChildAtoms'],
 
 	DynamicArray: jBinary.Property(
 		['lengthType', 'itemType'],
@@ -570,6 +570,170 @@ var MP4 = jBinary.FileFormat({
 
 	mehd: ['extend', 'FullBox', {
 		fragment_duration: 'FBUint'
+	}],
+
+	esds_section: ['extend', {
+		descriptor_type: 'uint8',
+		ext_type: jBinary.Property(
+			null,
+			function () {
+				var next_byte = this.binary.read('uint8');
+				if (next_byte === 0x80 || next_byte === 0x81 || next_byte === 0xFE) {
+					this.binary.skip(2);
+					return next_byte;
+				} else {
+					this.binary.skip(-1);
+				}
+			},
+			function (filler) {
+				if (filler !== undefined) this.binary.write('blob', [filler, filler, filler]);
+			}
+		),
+		length: 'uint8'
+	}, jBinary.Template(
+		null,
+		function (context) {
+			switch (context.descriptor_type) {
+				case 3: return {
+					es_id: 'uint16',
+					stream_priority: 'uint8'
+				};
+
+				case 4: return {
+					type: ['enum', 'uint8', {
+						1: 'v1',
+						2: 'v2',
+						32: 'mpeg4_video',
+						33: 'mpeg4_avc_sps',
+						34: 'mpeg4_avc_pps',
+						64: 'mpeg4_audio',
+						96: 'mpeg2_simple_video',
+						97: 'mpeg2_main_video',
+						98: 'mpeg2_snr_video',
+						99: 'mpeg2_spatial_video',
+						100: 'mpeg2_high_video',
+						101: 'mpeg2_422_video',
+						102: 'mpeg4_adts_main',
+						103: 'mpeg4_adts_low_complexity',
+						104: 'mpeg4_adts_scaleable_sampling',
+						105: 'mpeg2_adts_main',
+						106: 'mpeg1_video',
+						107: 'mpeg1_adts',
+						108: 'jpeg_video',
+						192: 'private_audio',
+						208: 'private_video',
+						224: 'pcm_little_endian_audio',
+						225: 'vorbis_audio',
+						226: 'dolby_v3_audio',
+						227: 'alaw_audio',
+						228: 'mulaw_audio',
+						229: 'adpcm_audio',
+						230: 'pcm_big_endian_audio',
+						240: 'yv12_video',
+						241: 'h264_video',
+						242: 'h263_video',
+						243: 'h261_video'
+					}],
+					stream_type: ['enum', 6, [
+						null,
+						'object',
+						'clock',
+						'scene',
+						'visual',
+						'audio',
+						'mpeg-7',
+						'ipmp',
+						'oci',
+						'mpeg-java'
+					]],
+					upstream_flag: 1,
+					_reserved: ['const', 1, 1],
+					buffer_size: 24,
+					maxBitrate: 'uint32',
+					avgBitrate: 'uint32'
+				};
+
+				case 5: return {
+					audio_profile: ['enum', 5, [
+						null,
+						'aac-main',
+						'aac-lc',
+						'aac-ssr',
+						'aac-ltp',
+						'sbr',
+						'aac-scalable',
+						'twinvq',
+						'celp',
+						'hxvc',
+						null,
+						null,
+						'ttsi',
+						'main-synthesis',
+						'wavetable-synthesis',
+						'general-midi',
+						'algorithmic-synthesis-and-audio-effects',
+						'er-aac-lc',
+						'reserved',
+						'er-aac-ltp',
+						'er-aac-scalable',
+						'er-twinvq',
+						'er-bsac',
+						'er-aac-ld',
+						'er-celp',
+						'er-hvxc',
+						'er-hiln',
+						'er-parametric',
+						'ssc',
+						'ps',
+						'mpeg-surround'
+					]],
+					sampling_freq: jBinary.Property(
+						function () {
+							this.freqList = [96000, 88200, 64000, 48000, 44100, 32000, 24000, 22050, 16000, 12000, 11025, 8000, 7350];
+						},
+						function () {
+							var freqIndex = this.binary.read(4);
+							return freqIndex !== 15 ? this.freqList[freqIndex] : this.binary.read(24);
+						},
+						function (value) {
+							var freqIndex = this.freqList.indexOf(value);
+							if (freqIndex !== -1) {
+								this.binary.write(4, freqIndex);
+							} else {
+								this.binary.write(4, 15);
+								this.binary.write(24, value);
+							}
+						}
+					),
+					channelConfig: 4,
+					frameLength: ['enum', 1, [1024, 960]],
+					dependsOnCoreCoder: 1,
+					extensionFlag: 1
+				};
+
+				case 6: return {
+					sl: ['const', 'uint8', 2]
+				};
+			}
+		}
+	)],
+
+	esds: ['extend', 'FullBox', {
+		sections: jBinary.Property(
+			null,
+			function () {
+				var end = this.binary.getContext('_end')._end, sections = [];
+				while (this.binary.tell() < end) {
+					sections.push(this.binary.read('esds_section'));
+				}
+				return sections;
+			},
+			function (sections) {
+				for (var i = 0, length = sections.length; i < length; i++) {
+					this.binary.write('esds_section', sections[i]);
+				}
+			}
+		)
 	}]
 }, ['Atoms', function () { return this.binary.view.byteLength }], 'video/mp4');
 
