@@ -1,28 +1,28 @@
 (function (exports) {
 
 var PES = {
-	Flag: jBinary.Property(
-		['dependentField'],
-		function () {
+	Flag: jBinary.Type({
+		params: ['dependentField'],
+		read: function () {
 			return this.binary.read(1);
 		},
-		function (value, context) {
+		write: function (value, context) {
 			this.binary.write(1, (this.dependentField in context ? 1 : 0));
 		}
-	),
+	}),
 
-	FlagDependent: jBinary.Property(
-		['flagField', 'baseType'],
-		function () {
+	FlagDependent: jBinary.Type({
+		params: ['flagField', 'baseType'],
+		read: function () {
 			return this.binary.read(['if', this.flagField, this.baseType]);
 		},
-		function () {
+		write: function () {
 			this.binary.write(this.baseType);
 		}
-	),
+	}),
 
-	PESTimeStamp: jBinary.Property(
-		function (prefix) {
+	PESTimeStamp: jBinary.Type({
+		init: function (prefix) {
 			var skipBit = ['const', 1, 1, true];
 			this.baseType = {
 				_prefix: ['const', 4, prefix, true],
@@ -34,18 +34,18 @@ var PES = {
 				_skip3: skipBit
 			};
 		},
-		function () {
+		read: function () {
 			var parts = this.binary.read(this.baseType);
 			return parts.loPart | (parts.midPart << 15) | (parts.hiPart << 30);
 		},
-		function (value) {
+		write: function (value) {
 			this.binary.write(this.baseType, {
 				hiPart: value >>> 30,
 				midPart: (value >>> 15) & ~(-1 << 15),
 				loPart: value & ~(-1 << 15)
 			});
 		}
-	),
+	}),
 
 	PESHeader: {
 		length: 'uint16',

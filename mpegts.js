@@ -1,45 +1,45 @@
 (function (exports) {
 
-var MPEGTS = jBinary.FileFormat({
+var MPEGTS = {
 	PCR: {
 		pts: 33,
 		_reserved: 6,
 		extension: 9
 	},
 
-	DynamicArray: jBinary.Property(
-		['lengthType', 'itemType'],
-		function () {
+	DynamicArray: jBinary.Type({
+		params: ['lengthType', 'itemType'],
+		read: function () {
 			var length = this.binary.read(this.lengthType);
 			return this.binary.read(['array', this.itemType, length]);
 		},
-		function (array) {
+		write: function (array) {
 			this.binary.write(this.lengthType, array.length);
 			this.binary.write(['array', this.itemType], array);
 		}
-	),
+	}),
 
 	Field: ['DynamicArray', 'uint8', 'uint8'],
 
-	Flag: jBinary.Property(
-	    ['dependentField'],
-		function () {
+	Flag: jBinary.Type({
+	    params: ['dependentField'],
+		read: function () {
 			return this.binary.read(1);
 		},
-		function (value, context) {
+		write: function (value, context) {
 			this.binary.write(1, (this.dependentField in context ? 1 : 0));
 		}
-	),
+	}),
 
-	FlagDependent: jBinary.Property(
-		['flagField', 'baseType'],
-		function () {
+	FlagDependent: jBinary.Type({
+		params: ['flagField', 'baseType'],
+		read: function () {
 			return this.binary.read(['if', this.flagField, this.baseType]);
 		},
-		function () {
+		write: function () {
 			this.binary.write(this.baseType);
 		}
-	),
+	}),
 
 	AdaptationField: {
 		length: 'uint8',
@@ -84,65 +84,67 @@ var MPEGTS = jBinary.FileFormat({
 
 			_dataLength: function () { return this.binary.getContext(1)._sectionLength - 9 },
 
-			data: jBinary.Property(null, function (header) {
-				var data, file = this.binary.getContext(3), dataLength = header._dataLength;
+			data: jBinary.Type({
+				read: function (header) {
+					var data, file = this.binary.getContext(3), dataLength = header._dataLength;
 
-				switch (this.binary.getContext(1).tableId) {
-					case 'PAT':
-						data = this.binary.read(['array', {
-							programNumber: 'uint16',
-							_reserved: 3,
-							pid: 13
-						}, dataLength / 4]);
-
-						if (header.sectionNumber == 0) {
-							file.pat = {};
-						}
-
-						for (var i = 0; i < data.length; i++) {
-							file.pat[data[i].pid] = data[i];
-						}
-
-						break;
-
-					case 'PMT':
-						data = this.binary.read({
-							_reserved: 3,
-							pcrPID: 13,
-							_reserved2: 4,
-							programDescriptors: ['DynamicArray', 12, 'uint8']
-						});
-
-						data.mappings = [];
-
-						dataLength -= 4 + data.programDescriptors.length;
-
-						while (dataLength > 0) {
-							var mapping = this.binary.read({
-								streamType: 'uint8',
+					switch (this.binary.getContext(1).tableId) {
+						case 'PAT':
+							data = this.binary.read(['array', {
+								programNumber: 'uint16',
 								_reserved: 3,
-								elementaryPID: 13,
+								pid: 13
+							}, dataLength / 4]);
+
+							if (header.sectionNumber == 0) {
+								file.pat = {};
+							}
+
+							for (var i = 0; i < data.length; i++) {
+								file.pat[data[i].pid] = data[i];
+							}
+
+							break;
+
+						case 'PMT':
+							data = this.binary.read({
+								_reserved: 3,
+								pcrPID: 13,
 								_reserved2: 4,
-								esInfo: ['DynamicArray', 12, 'uint8']
+								programDescriptors: ['DynamicArray', 12, 'uint8']
 							});
-							data.mappings.push(mapping);
 
-							dataLength -= 5 + mapping.esInfo.length;
-						}
+							data.mappings = [];
 
-						if (header.sectionNumber == 0) {
-							file.pmt = {};
-						}
+							dataLength -= 4 + data.programDescriptors.length;
 
-						for (var i = 0; i < data.mappings.length; i++) {
-							var mapping = data.mappings[i];
-							file.pmt[mapping.elementaryPID] = mapping;
-						}
+							while (dataLength > 0) {
+								var mapping = this.binary.read({
+									streamType: 'uint8',
+									_reserved: 3,
+									elementaryPID: 13,
+									_reserved2: 4,
+									esInfo: ['DynamicArray', 12, 'uint8']
+								});
+								data.mappings.push(mapping);
 
-						break;
+								dataLength -= 5 + mapping.esInfo.length;
+							}
+
+							if (header.sectionNumber == 0) {
+								file.pmt = {};
+							}
+
+							for (var i = 0; i < data.mappings.length; i++) {
+								var mapping = data.mappings[i];
+								file.pmt[mapping.elementaryPID] = mapping;
+							}
+
+							break;
+					}
+
+					return data;
 				}
-
-				return data;
 			}),
 
 			crc32: 'uint32'
@@ -167,9 +169,8 @@ var MPEGTS = jBinary.FileFormat({
 
 		adaptationField: ['FlagDependent', '_hasAdaptationField', 'AdaptationField'],
 
-		payload: ['FlagDependent', '_hasPayload', jBinary.Template(
-			null,
-			function (context) {
+		payload: ['FlagDependent', '_hasPayload', jBinary.Template({
+			getBaseType: function (context) {
 				var pid = context.pid, file = this.binary.getContext(1);
 				if (pid < 2 || pid in file.pat) {
 					return 'PrivateSection';
@@ -178,28 +179,28 @@ var MPEGTS = jBinary.FileFormat({
 					return 'ES';
 				}
 			}
-		)],
+		})],
 
 		_toEnd: function (context) { this.binary.seek(context._startof + 188) }
 	},
 
-	File: jBinary.Property(
-		function () {
+	File: jBinary.Type({
+		init: function () {
 			this.pat = {};
 			this.pmt = {};
 		},
-		function () {
+		read: function () {
 			return this.binary.inContext(this, function () {
 				return this.read(['array', 'Packet', this.view.byteLength / 188]);
 			});
 		},
-		function (packets) {
+		write: function (packets) {
 			this.binary.inContext(this, function () {
 				this.write(['array', 'Packet'], packets);
 			});
 		}
-	)
-}, 'File', 'video/mp2t');
+	})
+};
 
 if (typeof module !== 'undefined' && exports === module.exports) {
 	module.exports = MPEGTS;

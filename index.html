@@ -33,15 +33,17 @@
 			})();
 		}
 
-		MPEGTS.loadFrom('data/chunk-202.ts', function () {
+		jBinary.loadData('data/chunk-202.ts', function (data) {
+			var mpegts = new jBinary(data, MPEGTS);
+
 			console.time('convert');
 
 			console.time('read');
-			var packets = this.read();
+			var packets = mpegts.read('File');
 			console.timeEnd('read');
 
 			console.time('getStream');
-			var stream = new jDataView(this.binary.view.byteLength);
+			var stream = new jDataView(mpegts.view.byteLength);
 			for (var i = 0, length = packets.length; i < length; i++) {
 				var packet = packets[i], adaptation = packet.adaptationField, payload = packet.payload;
 				if (payload && payload._rawStream) {
@@ -186,13 +188,14 @@
 				audioSizes.push(audioHeader.data.length);
 				stream.writeBytes(audioHeader.data);
 			}
-			console.log(audioHeader);
 
 			console.timeEnd('filter');
 
+			console.log(audioHeader.samplingFreq, audioSizes.length, duration);
+
 			console.time('build');
-			var file = new MP4(stream.byteLength);
-			file.write({
+			var file = new jBinary(stream.byteLength, MP4);
+			file.write('File', {
 				ftyp: [{
 					major_brand: 'isom',
 					minor_version: 512,
@@ -530,7 +533,7 @@
 			console.timeEnd('build');
 
 			console.time('generateURL');
-			var url = new MP4(file.binary.view.slice(0, file.binary.tell())).toURL();
+			var url = file.slice(0, file.tell()).toURL('video/mp4');
 			console.timeEnd('generateURL');
 
 			console.timeEnd('convert');

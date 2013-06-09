@@ -1,15 +1,15 @@
 (function (exports) {
 
 var H264 = {
-	ExpGolomb: jBinary.Property(
-		['isSigned'],
-		function () {
+	ExpGolomb: jBinary.Type({
+		params: ['isSigned'],
+		read: function () {
 			var count = 0;
 			while (!this.binary.read(1)) count++;
 			var value = (1 << count) | this.binary.read(count);
 			return this.isSigned ? (value & 1 ? -(value >> 1) : value >> 1) : value - 1;
 		},
-		function (value) {
+		write: function (value) {
 			if (this.isSigned) {
 				value <<= 1;
 				if (value <= 0) {
@@ -22,26 +22,26 @@ var H264 = {
 			this.binary.write(length - 1, 0);
 			this.binary.write(length, value);
 		}
-	),
+	}),
 
-	Optional: jBinary.Property(
-	    ['baseType'],
-		function () {
+	Optional: jBinary.Type({
+	    params: ['baseType'],
+		read: function () {
 			if (this.binary.read(1)) return this.binary.read(this.baseType);
 		},
-		function (value) {
+		write: function (value) {
 			this.binary.write(value != null ? 1 : 0);
 			if (value != null) {
 				this.binary.write(this.baseType, value);
 			}
 		}
-	),
+	}),
 
-	ScalingList: jBinary.Template(
-		function (size) {
+	ScalingList: jBinary.Template({
+		init: function (size) {
 			this.baseType = ['array', { /* TODO: implement scaling list */ }, size];
 		}
-	),
+	}),
 
 	SPS: [
 		'extend',
@@ -52,7 +52,7 @@ var H264 = {
 			profile_idc: 'uint8',
 			constraint_set_flags: ['array', 1, 8],
 			level_idc: 'uint8',
-			seq_parameter_set_id: 'ExpGolomb',
+			seq_parameter_set_id: 'ExpGolomb'
 		},
 		['if', function (context) { return [100, 110, 122, 244, 44, 83, 86, 118].indexOf(context.profile_idc) >= 0 }, {
 			chroma_format: ['enum', 'ExpGolomb', ['MONO', 'YUV420', 'YUV422', 'YUV444']],
@@ -75,11 +75,10 @@ var H264 = {
 					delta_pic_order_always_zero_flag: 1,
 					offset_for_non_ref_pic: ['ExpGolomb', true],
 					offset_for_top_to_bottom_field: ['ExpGolomb', true],
-					_num_ref_frames_in_pic_order_cnt_cycle: jBinary.Property(
-						null,
-						function () { return this.binary.read('ExpGolomb') },
-						function (value, context) { this.binary.write('ExpGolomb', context.offset_for_ref_frame.length) }
-					),
+					_num_ref_frames_in_pic_order_cnt_cycle: jBinary.Template({
+						init: function () { this.baseType = 'ExpGolomb' },
+						write: function (value, context) { this.binary.write(this.baseType, context.offset_for_ref_frame.length) }
+					}),
 					offset_for_ref_frame: ['array', ['ExpGolomb', true], function (context) { return context._num_ref_frames_in_pic_order_cnt_cycle }]
 				}
 			]],
