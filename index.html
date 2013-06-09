@@ -2,15 +2,9 @@
 <html>
 <head>
 	<title>MPEG-TS Parser demo</title>
-	<style type="text/css">
-		.jsonContainer { color: #733; font-style: italic; word-wrap: break-word; display: block; float: left; width: 45%; margin-right: 2%; overflow-x: scroll; }
-		.jsonValue { color: #373; font-weight: bold; font-style: normal; }
-	</style>
 </head>
 <body>
-	<video id="video" controls>
-		<source id="source" type="video/mp4" />
-	</video>
+	<canvas id="canvas"></canvas>
 
 	<script>
 		if (true || !('time' in console)) {
@@ -26,13 +20,35 @@
 			})();
 		}
 
-		var worker = new Worker('worker.js'), video = document.getElementById('video'), source = document.getElementById('source');
+		var worker = new Worker('worker.js'), video = document.createElement('video'), source = document.createElement('source'), canvas = document.getElementById('canvas'), context;
+		source.type = 'video/mp4';
+		video.appendChild(source);
+
+		var requestAnimationFrame = window.requestAnimationFrame || window.mozRequestAnimationFrame || window.webkitRequestAnimationFrame || window.msRequestAnimationFrame || setTimeout;
+
+		function nextFrame() {
+			if (video.paused || video.ended) return;
+			context.drawImage(video, 0, 0);
+			requestAnimationFrame(nextFrame);
+		}
+
+		video.addEventListener('loadedmetadata', function () {
+			canvas.width = video.width = video.videoWidth;
+			canvas.height = video.height = video.videoHeight;
+			canvas.style.border = '1px solid black';
+			context = canvas.getContext('2d');
+			video.play();
+		});
+
+		video.addEventListener('play', nextFrame);
+
 		worker.addEventListener('message', function (event) {
 			console.timeEnd('converting');
 			video.src = source.src = event.data;
-			video.play();
 		});
+
 		worker.postMessage('data/sample.ts');
+
 		console.time('converting');
 	</script>
 </body>
