@@ -46,9 +46,6 @@ var H264 = {
 	SPS: [
 		'extend',
 		{
-			forbidden_zero_bit: 1,
-			nal_ref_idc: 2,
-			nal_unit_type: 5,
 			profile_idc: 'uint8',
 			constraint_set_flags: ['array', 1, 8],
 			level_idc: 'uint8',
@@ -97,7 +94,25 @@ var H264 = {
 			}]
 			// TODO: add VUI parameters
 		}
-	]
+	],
+
+	NALUnit: jBinary.Type({
+		read: function () {
+			var sync = this.binary.read(['blob', 3]); // [0, 0, 1] or [0, 0, 0, 1]
+			if (sync[2] === 0) this.binary.skip(1);
+			var end = this.binary.view.byteLength;
+			for (var i = this.binary.tell(); i < end - 4; i++) {
+				var next = this.binary.read(['blob', 4], i);
+				if (next[0] === 0 && next[1] === 0 && (next[2] === 1 || (next[2] === 0 && next[3] === 1))) {
+					end = i;
+					break;
+				}
+			}
+			var data = this.binary.read(['blob', end - this.binary.tell()]);
+			// TODO: ideally there should be Annex.B conversion from [0, 0, 3, X=0..3] to [0, 0, X]
+			return data;
+		}
+	})
 };
 
 if (typeof module !== 'undefined' && exports === module.exports) {

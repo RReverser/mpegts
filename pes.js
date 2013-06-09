@@ -47,28 +47,66 @@ var PES = {
 		}
 	}),
 
-	PESHeader: {
+	PESPacket: ['extend', {
+		_startCode: ['const', ['blob', 3], [0, 0, 1]],
+		streamId: 'uint8',
 		length: 'uint16',
-		_marker: ['const', 2, 2],
-		scramblingControl: ['enum', 2, ['not_scrambled']],
-		priority: 1,
-		dataAlignmentIndicator: 1,
-		hasCopyright: 1,
-		isOriginal: 1,
-		_hasPTS: ['Flag', 'pts'],
-		_hasDTS: ['Flag', 'dts'],
-		_hasESCR: ['Flag', 'escr'],
-		_hasESRate: ['Flag', 'esRate'],
-		dsmTrickMode: 1,
-		_hasAdditionalCopyInfo: ['Flag', 'additionalCopyInfo'],
-		_hasPESCRC: ['Flag', 'pesCRC'],
-		_hasExtension: ['Flag', 'extension'],
-		dataLength: 'uint8',
-		_end: function (context) { return this.binary.tell() + context.dataLength },
-		pts: ['FlagDependent', '_hasPTS', ['if', ['_hasDTS'], ['PESTimeStamp', 3], ['PESTimeStamp', 2]]],
-		dts: ['FlagDependent', '_hasDTS', ['PESTimeStamp', 1]],
-		_toEnd: function (context) { this.binary.seek(context._end) }
-	}
+		_end: function (context) {
+			var pos = this.binary.tell(), length = context.length;
+
+			if (length) {
+				return pos + length;
+			}
+
+			/*
+			not sure if it correctly covers cases where `length`==0
+			(according to specification, it may be written as zero for video streams >=64K length)
+			but should work for H.264 streams since NAL unit types always have clear highest bit (`forbidden_zero_bit`)
+			*/
+			var fileEnd = this.binary.view.byteLength;
+			for (var i = pos + 65536; i < fileEnd - 15; i++) {
+				var next = this.binary.read(['blob', 4], i);
+				if (next[0] === 0 && next[1] === 0 && next[2] === 1 && (next[3] & 0x80)) {
+					return i;
+				}
+			}
+			return fileEnd;
+		}
+	}, jBinary.Type({
+		init: function () {
+			this.baseType = {
+				_marker: ['const', 2, 2, true],
+				scramblingControl: ['enum', 2, ['not_scrambled']],
+				priority: 1,
+				dataAlignmentIndicator: 1,
+				hasCopyright: 1,
+				isOriginal: 1,
+				_hasPTS: ['Flag', 'pts'],
+				_hasDTS: ['Flag', 'dts'],
+				_hasESCR: ['Flag', 'escr'],
+				_hasESRate: ['Flag', 'esRate'],
+				dsmTrickMode: 1,
+				_hasAdditionalCopyInfo: ['Flag', 'additionalCopyInfo'],
+				_hasPESCRC: ['Flag', 'pesCRC'],
+				_hasExtension: ['Flag', 'extension'],
+				dataLength: 'uint8',
+				_headerEnd: function (context) { return this.binary.tell() + context.dataLength },
+				pts: ['FlagDependent', '_hasPTS', ['if', ['_hasDTS'], ['PESTimeStamp', 3], ['PESTimeStamp', 2]]],
+				dts: ['FlagDependent', '_hasDTS', ['PESTimeStamp', 1]],
+				_toHeaderEnd: function (context) { this.binary.seek(context._headerEnd) }
+			};
+		},
+		read: function () {
+			try {
+				return this.binary.read(this.baseType);
+			} catch (e) {
+				this.binary.read(6);
+				this.binary.skip(-1);
+			}
+		}
+	}), {
+		data: ['blob', function () { return this.binary.getContext(1)._end - this.binary.tell() }]
+	}]
 };
 
 if (typeof module !== 'undefined' && exports === module.exports) {

@@ -33,7 +33,7 @@
 			})();
 		}
 
-		jBinary.loadData('data/chunk-202.ts', function (data) {
+		jBinary.loadData('data/sample.ts', function (data) {
 			var mpegts = new jBinary(data, MPEGTS);
 
 			console.time('convert');
@@ -53,81 +53,49 @@
 			console.timeEnd('getStream');
 
 			console.time('filter');
-			var original = stream.getBytes(stream.tell(), 0, true, true), pesStream = new jBinary(original, PES), audioStream = new jBinary(stream.byteLength), samples = [], curSample = {};
-			stream.seek(0);
-			for (var i = 0, start = 0, streamId, length = original.length; i <= length; i++) {
-				if (i === length || (original[i] === 0 && original[i + 1] === 0 && original[i + 2] === 1)) {
-					switch (streamId) {
-						case 0x67:
-							if (!sps) {
-								var sps = original.slice(start, i);
-								var spsInfo = new jBinary(sps, H264).read('SPS');
-								var width = (spsInfo.pic_width_in_mbs_minus_1 + 1) * 16;
-								var height = (2 - spsInfo.frame_mbs_only_flag) * (spsInfo.pic_height_in_map_units_minus_1 + 1) * 16;
-								var cropping = spsInfo.frame_cropping;
-								if (cropping) {
-									width -= 2 * (cropping.left + cropping.right);
-									height -= 2 * (cropping.top + cropping.bottom);
+			var pesStream = new jBinary(stream.slice(0, stream.tell()), PES), audioStream = new jBinary(stream.byteLength), samples = [];
+			stream = new jDataView(stream.byteLength);
+			while (pesStream.tell() < pesStream.view.byteLength) {
+				var packet = pesStream.read('PESPacket');
+				if (packet.streamId === 0xC0) {
+					audioStream.write('blob', packet.data);
+				} else
+				if (packet.streamId === 0xE0) {
+					var nalStream = new jBinary(packet.data, H264), curSample = {offset: stream.tell(), pts: packet.pts, dts: packet.dts || packet.pts};
+					samples.push(curSample);
+					while (nalStream.tell() < nalStream.view.byteLength) {
+						var nalUnit = nalStream.read('NALUnit');
+						switch (nalUnit[0]) {
+							case 0x67:
+								if (!sps) {
+									var sps = nalUnit;
+									var spsInfo = new jBinary(sps, H264).read('SPS');
+									var width = (spsInfo.pic_width_in_mbs_minus_1 + 1) * 16;
+									var height = (2 - spsInfo.frame_mbs_only_flag) * (spsInfo.pic_height_in_map_units_minus_1 + 1) * 16;
+									var cropping = spsInfo.frame_cropping;
+									if (cropping) {
+										width -= 2 * (cropping.left + cropping.right);
+										height -= 2 * (cropping.top + cropping.bottom);
+									}
 								}
-							}
-							break;
+								break;
 
-						case 0x68:
-							if (!pps) {
-								var pps = original.slice(start, i);
-							}
-							break;
+							case 0x68:
+								if (!pps) {
+									var pps = nalUnit;
+								}
+								break;
 
-						case 0x09:
-							curSample.offset = stream.tell();
-							samples.push(curSample);
-							curSample = {};
-							// copy all that were not parsed yet and do not have forbidden_zero_bit
-							if (i > start && !(streamId & 0x80)) {
-								stream.writeUint32(i - start);
-								stream.writeBytes(original.slice(start, i));
-							}
-							break;
-
-						case 0xC0:
-							pesStream.seek(start + 1);
-							var audioLength = pesStream.read('PESHeader').length;
-							audioLength += -(pesStream.tell() - (start + 1)) + 2;
-							audioStream.write('blob', pesStream.read(['blob', audioLength]));
-							break;
-
-						case 0xE0:
-							try {
-								pesStream.seek(start + 1);
-								var pesHeader = pesStream.read('PESHeader');
-								curSample.pts = pesHeader.pts;
-								curSample.dts = pesHeader.dts || pesHeader.pts;
-							} catch (e) { }
-							break;
-
-						case 0x65:
-							curSample.isIDR = true;
-
-						default:
-							/*
-							if (streamId === 0x01 || streamId === 0x41 || streamId === 0x65) {
-								var sliceHeader = pesStream.view.slice(start + 1, i).toBinary(H264);
-								sliceHeader.read('ExpGolomb');
-								curSample.frameType = ['P', 'B', 'I', 'SP', 'SI'][sliceHeader.read('ExpGolomb') % 5];
-							}
-							*/
-							// copy all that were not parsed yet and do not have forbidden_zero_bit
-							if (i > start && !(streamId & 0x80)) {
-								stream.writeUint32(i - start);
-								stream.writeBytes(original.slice(start, i));
-							}
-							break;
+							case 0x65:
+								curSample.isIDR = true;
+							/* falls through */
+							default:
+								stream.writeUint32(nalUnit.length);
+								stream.writeBytes(nalUnit);
+						}
 					}
-					start = i += 3;
-					streamId = original[i];
 				}
 			}
-
 			samples.push({offset: stream.tell()});
 
 			var sizes = [], dtsDiffs = [], accessIndexes = [], pts_dts_Diffs = [], current = samples[0], frameRate = {sum: 0, count: 0}, duration = 0;
@@ -191,7 +159,7 @@
 
 			console.timeEnd('filter');
 
-			console.log(audioHeader.samplingFreq, audioSizes.length, duration);
+			console.log(accessIndexes);
 
 			console.time('build');
 			var file = new jBinary(stream.byteLength, MP4);
