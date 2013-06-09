@@ -63,11 +63,11 @@ var PES = {
 			(according to specification, it may be written as zero for video streams >=64K length)
 			but should work for H.264 streams since NAL unit types always have clear highest bit (`forbidden_zero_bit`)
 			*/
-			var fileEnd = this.binary.view.byteLength;
-			for (var i = pos + 65536; i < fileEnd - 15; i++) {
-				var next = this.binary.read(['blob', 4], i);
-				if (next[0] === 0 && next[1] === 0 && next[2] === 1 && (next[3] & 0x80)) {
-					return i;
+			pos += 65536;
+			var fileEnd = this.binary.view.byteLength, bytes = this.binary.seek(pos, function () { return this.view.getBytes() });
+			for (var i = 0; i < bytes.length - 4; i++) {
+				if (bytes[i] === 0 && bytes[i + 1] === 0 && bytes[i + 2] === 1 && (bytes[i + 3] & 0x80)) {
+					return pos + i;
 				}
 			}
 			return fileEnd;
