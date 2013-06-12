@@ -8,11 +8,16 @@ importScripts(
 	'adts.js'
 );
 
-var console = this.console || {
-	log: function () {},
-	time: function () {},
-	timeEnd: function () {}
-};
+var console = {};
+['log', 'time', 'timeEnd'].forEach(function (action) {
+	console[action] = function () {
+		postMessage({
+			type: 'debug',
+			action: action,
+			args: Array.prototype.slice.call(arguments)
+		});
+	};
+});
 
 addEventListener('message', function (event) {
 	jBinary.loadData(event.data, function (data) {
@@ -39,6 +44,7 @@ addEventListener('message', function (event) {
 		stream = new jDataView(stream.byteLength);
 		while (pesStream.tell() < pesStream.view.byteLength) {
 			var packet = pesStream.read('PESPacket');
+			console.log(packet);
 			if (packet.streamId === 0xC0) {
 				audioStream.write('blob', packet.data);
 			} else
@@ -47,6 +53,7 @@ addEventListener('message', function (event) {
 				samples.push(curSample);
 				while (nalStream.tell() < nalStream.view.byteLength) {
 					var nalUnit = nalStream.read('NALUnit');
+					console.log(nalUnit[0]);
 					switch (nalUnit[0]) {
 						case 0x67:
 							if (!sps) {
@@ -480,6 +487,6 @@ addEventListener('message', function (event) {
 
 		console.timeEnd('convert');
 
-		postMessage(url);
+		postMessage({type: 'video', url: url});
 	});
 });

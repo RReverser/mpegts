@@ -43,11 +43,37 @@
 		video.addEventListener('play', nextFrame);
 
 		worker.addEventListener('message', function (event) {
-			console.timeEnd('converting');
-			video.src = source.src = event.data;
+			var data = event.data;
+			switch (data.type) {
+				case 'debug':
+					console[data.action].apply(console, data.args);
+					return;
+
+				case 'video':
+					console.timeEnd('converting');
+					video.src = source.src = data.url;
+					return;
+			}
 		});
 
-		worker.postMessage('data/sample.ts');
+		var ajax = new XMLHttpRequest();
+		var manifest = '/iphone/samples/bipbop/gear1/prog_index.m3u8';
+		ajax.addEventListener('load', function () {
+			var baseUrl = manifest.replace(/(.*\/).*?$/, '$1');
+
+			// TODO: change to more intelligent solution
+			var files =
+				this.responseText
+				.split('\n')
+				.filter(RegExp.prototype.test.bind(/\.ts$/))
+				.map(function (url) { return baseUrl + url });
+
+			// console.log(files);
+
+			worker.postMessage(files[0]);
+		});
+		ajax.open('GET', manifest, true);
+		ajax.send();
 
 		console.time('converting');
 	</script>
