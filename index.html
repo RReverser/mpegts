@@ -20,7 +20,7 @@
 			})();
 		}
 
-		var worker = new Worker('worker.js'), nextIndex = 0, sentVideos = 0, currentVideo = null, videos = [], canvas = document.getElementById('canvas'), context = canvas.getContext('2d');
+		var worker = new Worker('worker.js'), nextIndex = 0, sentVideos = 0, currentVideo = null, videos = [], lastOriginal, canvas = document.getElementById('canvas'), context = canvas.getContext('2d');
 
 		var requestAnimationFrame = window.requestAnimationFrame || window.mozRequestAnimationFrame || window.webkitRequestAnimationFrame || window.msRequestAnimationFrame || setTimeout;
 
@@ -92,7 +92,7 @@
 
 		canvas.addEventListener('click', function () {
 			if (currentVideo) {
-				currentVideo.paused ? currentVideo.pause() : currentVideo.play();
+				currentVideo.paused ? currentVideo.play() : currentVideo.pause();
 			}
 		});
 
@@ -100,17 +100,22 @@
 			var ajax = new XMLHttpRequest();
 			var manifest = 'http://localhost/hls/live/203739/NASATV1_iOS_HD/Edge.m3u8';
 			ajax.addEventListener('load', function () {
-				var videos =
+				var originals =
 					this.responseText
 					.split(/\r?\n/)
 					.filter(RegExp.prototype.test.bind(/\.ts$/))
 					.map(function (url) { return url.replace('nasahd-i.akamaihd.net', 'localhost') });
 
-				videos.forEach(function (url, index) {
-					worker.postMessage({url: url, index: sentVideos++});
+				originals = originals.slice(originals.lastIndexOf(lastOriginal) + 1);
+				lastOriginal = originals[originals.length - 1];
+
+				originals.forEach(function (url, index) {
+					worker.postMessage({url: url, index: sentVideos + index});
 				});
 
-				console.log('asked for ' + videos.length + ' more videos');
+				sentVideos += originals.length;
+
+				console.log('asked for ' + originals.length + ' more videos');
 			});
 			ajax.open('GET', manifest, true);
 			ajax.send();
