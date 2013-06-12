@@ -57,18 +57,16 @@
 		});
 
 		var ajax = new XMLHttpRequest();
-		var manifest = '/iphone/samples/bipbop/gear1/prog_index.m3u8';
+		var manifest = 'http://localhost/hls/live/203739/NASATV1_iOS_HD/Edge.m3u8';
 		ajax.addEventListener('load', function () {
-			var baseUrl = manifest.replace(/(.*\/).*?$/, '$1');
-
 			// TODO: change to more intelligent solution
 			var files =
 				this.responseText
-				.split('\n')
+				.split(/\r?\n/)
 				.filter(RegExp.prototype.test.bind(/\.ts$/))
-				.map(function (url) { return baseUrl + url });
+				.map(function (url) { return url.replace('nasahd-i.akamaihd.net', 'localhost') });
 
-			// console.log(files);
+			console.log(files);
 
 			worker.postMessage(files[0]);
 		});
