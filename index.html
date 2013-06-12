@@ -7,73 +7,116 @@
 	<canvas id="canvas"></canvas>
 
 	<script>
-		if (true || !('time' in console)) {
+		if (!('time' in console)) {
 			(function () {
 				var timeStarts = {}, nowHost = typeof performance !== 'undefined' && 'now' in performance ? performance : Date;
 				console.time = function (id) {
 					timeStarts[id] = nowHost.now();
 				};
 				console.timeEnd = function (id) {
-					console.log(document.title = id + ': ' + (nowHost.now() - timeStarts[id]) + ' ms');
+					console.log(id + ': ' + (nowHost.now() - timeStarts[id]) + ' ms');
 					delete timeStarts[id];
 				};
 			})();
 		}
 
-		var worker = new Worker('worker.js'), video = document.createElement('video'), source = document.createElement('source'), canvas = document.getElementById('canvas'), context;
-		source.type = 'video/mp4';
-		video.appendChild(source);
+		var worker = new Worker('worker.js'), nextIndex = 0, sentVideos = 0, currentVideo = null, videos = [], canvas = document.getElementById('canvas'), context = canvas.getContext('2d');
 
 		var requestAnimationFrame = window.requestAnimationFrame || window.mozRequestAnimationFrame || window.webkitRequestAnimationFrame || window.msRequestAnimationFrame || setTimeout;
 
 		function nextFrame() {
-			if (video.paused || video.ended) return;
-			context.drawImage(video, 0, 0);
+			if (currentVideo.paused || currentVideo.ended) {
+				return;
+			}
+			context.drawImage(currentVideo, 0, 0);
 			requestAnimationFrame(nextFrame);
 		}
 
-		video.addEventListener('loadedmetadata', function () {
-			canvas.width = video.width = video.videoWidth;
-			canvas.height = video.height = video.videoHeight;
-			canvas.style.border = '1px solid black';
-			context = canvas.getContext('2d');
-			video.play();
-		});
-
-		video.addEventListener('play', nextFrame);
-
 		worker.addEventListener('message', function (event) {
-			var data = event.data;
+			var data = event.data, descriptor = '#' + data.index + ': ' + data.original;
+
 			switch (data.type) {
 				case 'debug':
-					console[data.action].apply(console, data.args);
+					// console[data.action].apply(console, data.args);
 					return;
 
 				case 'video':
-					console.timeEnd('converting');
+					var video = document.createElement('video'), source = document.createElement('source');
+					source.type = 'video/mp4';
+					video.preload = 'auto';
+					video.appendChild(source);
+
 					video.src = source.src = data.url;
+					
+					video.addEventListener('canplaythrough', function () {
+						console.log('converted ' + descriptor);
+						this.currentTime = 0.02;
+						videos[data.index] = this;
+						if ((!currentVideo || currentVideo.ended) && data.index === nextIndex) {
+							this.play();
+						}
+					});
+
+					video.addEventListener('play', function () {
+						if (currentVideo !== this) {
+							if (!currentVideo) {
+								canvas.width = this.width = this.videoWidth;
+								canvas.height = this.height = this.videoHeight;
+							}
+							console.log('playing ' + descriptor);
+							currentVideo = this;
+							nextIndex++;
+							if (sentVideos - nextIndex <= 1) {
+								getMore();
+							}
+						}
+						nextFrame();
+					});
+
+					video.addEventListener('ended', function () {
+						delete videos[nextIndex - 1];
+						if (nextIndex in videos) {
+							videos[nextIndex].play();
+						}
+					});
+
+					if (typeof URL !== 'undefined') {
+						video.addEventListener('ended', function () {
+							URL.revokeObjectURL(this.src);
+						});
+					}
+
 					return;
 			}
 		});
 
-		var ajax = new XMLHttpRequest();
-		var manifest = 'http://localhost/hls/live/203739/NASATV1_iOS_HD/Edge.m3u8';
-		ajax.addEventListener('load', function () {
-			// TODO: change to more intelligent solution
-			var files =
-				this.responseText
-				.split(/\r?\n/)
-				.filter(RegExp.prototype.test.bind(/\.ts$/))
-				.map(function (url) { return url.replace('nasahd-i.akamaihd.net', 'localhost') });
-
-			console.log(files);
-
-			worker.postMessage(files[0]);
+		canvas.addEventListener('click', function () {
+			if (currentVideo) {
+				currentVideo.paused ? currentVideo.pause() : currentVideo.play();
+			}
 		});
-		ajax.open('GET', manifest, true);
-		ajax.send();
 
-		console.time('converting');
+		function getMore() {
+			var ajax = new XMLHttpRequest();
+			var manifest = 'http://localhost/hls/live/203739/NASATV1_iOS_HD/Edge.m3u8';
+			ajax.addEventListener('load', function () {
+				var videos =
+					this.responseText
+					.split(/\r?\n/)
+					.filter(RegExp.prototype.test.bind(/\.ts$/))
+					.map(function (url) { return url.replace('nasahd-i.akamaihd.net', 'localhost') });
+
+				videos.forEach(function (url, index) {
+					worker.postMessage({url: url, index: sentVideos++});
+				});
+
+				console.log('asked for ' + videos.length + ' more videos');
+			});
+			ajax.open('GET', manifest, true);
+			ajax.send();
+		}
+
+		getMore();
 	</script>
 </body>
 </html>

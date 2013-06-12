@@ -20,7 +20,9 @@ var console = {};
 });
 
 addEventListener('message', function (event) {
-	jBinary.loadData(event.data, function (data) {
+	var msg = event.data;
+
+	jBinary.loadData(msg.url, function (data) {
 		var mpegts = new jBinary(data, MPEGTS);
 
 		console.time('convert');
@@ -487,6 +489,6 @@ addEventListener('message', function (event) {
 
 		console.timeEnd('convert');
 
-		postMessage({type: 'video', url: url});
+		postMessage({type: 'video', index: msg.index, original: msg.url, url: url});
 	});
 });
