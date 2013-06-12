@@ -42,6 +42,7 @@ addEventListener('message', function (event) {
 		console.time('filter');
 		var pesStream = new jBinary(stream.slice(0, stream.tell()), PES), audioStream = new jBinary(stream.byteLength, ADTS), samples = [], audioSamples = [];
 		stream = new jDataView(stream.byteLength);
+		console.log(pesStream.toURL());
 		while (pesStream.tell() < pesStream.view.byteLength) {
 			var packet = pesStream.read('PESPacket');
 			console.log(packet);
@@ -53,9 +54,8 @@ addEventListener('message', function (event) {
 				samples.push(curSample);
 				while (nalStream.tell() < nalStream.view.byteLength) {
 					var nalUnit = nalStream.read('NALUnit');
-					console.log(nalUnit[0]);
-					switch (nalUnit[0]) {
-						case 0x67:
+					switch (nalUnit[0] & 0x1F) {
+						case 7:
 							if (!sps) {
 								var sps = nalUnit;
 								var spsInfo = new jBinary(sps, H264).read('SPS');
@@ -69,13 +69,13 @@ addEventListener('message', function (event) {
 							}
 							break;
 
-						case 0x68:
+						case 8:
 							if (!pps) {
 								var pps = nalUnit;
 							}
 							break;
 
-						case 0x65:
+						case 5:
 							curSample.isIDR = true;
 						/* falls through */
 						default:
