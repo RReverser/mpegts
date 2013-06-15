@@ -71,28 +71,26 @@ var PES = {
 			return fileEnd;
 		}
 	}, jBinary.Template({
-		init: function () {
-			this.baseType = {
-				_marker: ['const', 2, 2, true],
-				scramblingControl: ['enum', 2, ['not_scrambled']],
-				priority: 1,
-				dataAlignmentIndicator: 1,
-				hasCopyright: 1,
-				isOriginal: 1,
-				_hasPTS: ['Flag', 'pts'],
-				_hasDTS: ['Flag', 'dts'],
-				_hasESCR: ['Flag', 'escr'],
-				_hasESRate: ['Flag', 'esRate'],
-				dsmTrickMode: 1,
-				_hasAdditionalCopyInfo: ['Flag', 'additionalCopyInfo'],
-				_hasPESCRC: ['Flag', 'pesCRC'],
-				_hasExtension: ['Flag', 'extension'],
-				dataLength: 'uint8',
-				_headerEnd: function (context) { return this.binary.tell() + context.dataLength },
-				pts: ['FlagDependent', '_hasPTS', ['if', ['_hasDTS'], ['PESTimeStamp', 3], ['PESTimeStamp', 2]]],
-				dts: ['FlagDependent', '_hasDTS', ['PESTimeStamp', 1]],
-				_toHeaderEnd: function (context) { this.binary.seek(context._headerEnd) }
-			};
+		baseType: {
+			_marker: ['const', 2, 2, true],
+			scramblingControl: ['enum', 2, ['not_scrambled']],
+			priority: 1,
+			dataAlignmentIndicator: 1,
+			hasCopyright: 1,
+			isOriginal: 1,
+			_hasPTS: ['Flag', 'pts'],
+			_hasDTS: ['Flag', 'dts'],
+			_hasESCR: ['Flag', 'escr'],
+			_hasESRate: ['Flag', 'esRate'],
+			dsmTrickMode: 1,
+			_hasAdditionalCopyInfo: ['Flag', 'additionalCopyInfo'],
+			_hasPESCRC: ['Flag', 'pesCRC'],
+			_hasExtension: ['Flag', 'extension'],
+			dataLength: 'uint8',
+			_headerEnd: function (context) { return this.binary.tell() + context.dataLength },
+			pts: ['FlagDependent', '_hasPTS', ['if', ['_hasDTS'], ['PESTimeStamp', 3], ['PESTimeStamp', 2]]],
+			dts: ['FlagDependent', '_hasDTS', ['PESTimeStamp', 1]],
+			_toHeaderEnd: function (context) { this.binary.seek(context._headerEnd) }
 		},
 		read: function () {
 			var pos = this.binary.tell();

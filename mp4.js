@@ -24,9 +24,7 @@ var MP4 = {
 			return this.binary.tell();
 		},
 		_size: jBinary.Template({
-			init: function () {
-				this.baseType = 'uint32';
-			},
+			baseType: 'uint32',
 			write: function (value, context) {
 				var size = context.size;
 				this.baseWrite(size ? (size < Math.pow(2, 32) ? size : 1) : 0);

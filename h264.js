@@ -73,7 +73,7 @@ var H264 = {
 					offset_for_non_ref_pic: ['ExpGolomb', true],
 					offset_for_top_to_bottom_field: ['ExpGolomb', true],
 					_num_ref_frames_in_pic_order_cnt_cycle: jBinary.Template({
-						init: function () { this.baseType = 'ExpGolomb' },
+						baseType: 'ExpGolomb',
 						write: function (value, context) { this.baseWrite(context.offset_for_ref_frame.length) }
 					}),
 					offset_for_ref_frame: ['array', ['ExpGolomb', true], function (context) { return context._num_ref_frames_in_pic_order_cnt_cycle }]
