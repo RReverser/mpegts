@@ -24,15 +24,15 @@ var H264 = {
 		}
 	}),
 
-	Optional: jBinary.Type({
+	Optional: jBinary.Template({
 	    params: ['baseType'],
 		read: function () {
-			if (this.binary.read(1)) return this.binary.read(this.baseType);
+			if (this.binary.read(1)) return this.baseRead();
 		},
 		write: function (value) {
 			this.binary.write(value != null ? 1 : 0);
 			if (value != null) {
-				this.binary.write(this.baseType, value);
+				this.baseWrite(value);
 			}
 		}
 	}),
@@ -74,7 +74,7 @@ var H264 = {
 					offset_for_top_to_bottom_field: ['ExpGolomb', true],
 					_num_ref_frames_in_pic_order_cnt_cycle: jBinary.Template({
 						init: function () { this.baseType = 'ExpGolomb' },
-						write: function (value, context) { this.binary.write(this.baseType, context.offset_for_ref_frame.length) }
+						write: function (value, context) { this.baseWrite(context.offset_for_ref_frame.length) }
 					}),
 					offset_for_ref_frame: ['array', ['ExpGolomb', true], function (context) { return context._num_ref_frames_in_pic_order_cnt_cycle }]
 				}

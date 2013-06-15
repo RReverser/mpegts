@@ -11,17 +11,14 @@ var PES = {
 		}
 	}),
 
-	FlagDependent: jBinary.Type({
+	FlagDependent: jBinary.Template({
 		params: ['flagField', 'baseType'],
 		read: function () {
 			return this.binary.read(['if', this.flagField, this.baseType]);
-		},
-		write: function () {
-			this.binary.write(this.baseType);
 		}
 	}),
 
-	PESTimeStamp: jBinary.Type({
+	PESTimeStamp: jBinary.Template({
 		init: function (prefix) {
 			var skipBit = ['const', 1, 1, true];
 			this.baseType = {
@@ -35,11 +32,11 @@ var PES = {
 			};
 		},
 		read: function () {
-			var parts = this.binary.read(this.baseType);
+			var parts = this.baseRead();
 			return parts.loPart | (parts.midPart << 15) | (parts.hiPart << 30);
 		},
 		write: function (value) {
-			this.binary.write(this.baseType, {
+			this.baseWrite({
 				hiPart: value >>> 30,
 				midPart: (value >>> 15) & ~(-1 << 15),
 				loPart: value & ~(-1 << 15)
@@ -73,7 +70,7 @@ var PES = {
 			}
 			return fileEnd;
 		}
-	}, jBinary.Type({
+	}, jBinary.Template({
 		init: function () {
 			this.baseType = {
 				_marker: ['const', 2, 2, true],
@@ -100,7 +97,7 @@ var PES = {
 		read: function () {
 			var pos = this.binary.tell();
 			try {
-				return this.binary.read(this.baseType);
+				return this.baseRead();
 			} catch (e) {
 				this.binary.seek(pos);
 				this.binary._bitShift = 0;

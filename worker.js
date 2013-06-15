@@ -22,16 +22,16 @@ var console = {};
 addEventListener('message', function (event) {
 	var msg = event.data;
 
-	jBinary.loadData(msg.url, function (data) {
+	jBinary.loadData(msg.url, function (err, data) {
 		var mpegts = new jBinary(data, MPEGTS);
 
-		console.time('convert');
+		// console.time('convert');
 
-		console.time('read');
+		// console.time('read');
 		var packets = mpegts.read('File');
-		console.timeEnd('read');
+		// console.timeEnd('read');
 
-		console.time('getStream');
+		// console.time('getStream');
 		var stream = new jDataView(mpegts.view.byteLength);
 		for (var i = 0, length = packets.length; i < length; i++) {
 			var packet = packets[i], adaptation = packet.adaptationField, payload = packet.payload;
@@ -39,15 +39,15 @@ addEventListener('message', function (event) {
 				stream.writeBytes(payload._rawStream);
 			}
 		}
-		console.timeEnd('getStream');
+		// console.timeEnd('getStream');
 
-		console.time('filter');
+		// console.time('filter');
 		var pesStream = new jBinary(stream.slice(0, stream.tell()), PES), audioStream = new jBinary(stream.byteLength, ADTS), samples = [], audioSamples = [];
 		stream = new jDataView(stream.byteLength);
-		console.log(pesStream.toURL());
+		// console.log(pesStream.toURL());
 		while (pesStream.tell() < pesStream.view.byteLength) {
 			var packet = pesStream.read('PESPacket');
-			console.log(packet);
+			// console.log(packet);
 			if (packet.streamId === 0xC0) {
 				audioStream.write('blob', packet.data);
 			} else
@@ -142,9 +142,9 @@ addEventListener('message', function (event) {
 			stream.writeBytes(audioHeader.data);
 		}
 
-		console.timeEnd('filter');
+		// console.timeEnd('filter');
 
-		console.time('build');
+		// console.time('build');
 		var file = new jBinary(stream.byteLength, MP4);
 		file.write('File', {
 			ftyp: [{
@@ -481,13 +481,13 @@ addEventListener('message', function (event) {
 				}
 			}]
 		});
-		console.timeEnd('build');
+		// console.timeEnd('build');
 
-		console.time('generateURL');
+		// console.time('generateURL');
 		var url = file.slice(0, file.tell()).toURL('video/mp4');
-		console.timeEnd('generateURL');
+		// console.timeEnd('generateURL');
 
-		console.timeEnd('convert');
+		// console.timeEnd('convert');
 
 		postMessage({type: 'video', index: msg.index, original: msg.url, url: url});
 	});

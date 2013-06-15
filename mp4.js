@@ -29,7 +29,7 @@ var MP4 = {
 			},
 			write: function (value, context) {
 				var size = context.size;
-				this.binary.write(this.baseType, size ? (size < Math.pow(2, 32) ? size : 1) : 0);
+				this.baseWrite(size ? (size < Math.pow(2, 32) ? size : 1) : 0);
 			}
 		}),
 		type: 'ShortName',
@@ -78,29 +78,29 @@ var MP4 = {
 		}
 	}),
 
-	Time: jBinary.Type({
+	Time: jBinary.Template({
 		params: ['baseType'],
 		read: function () {
-			var intTime = this.binary.read(this.baseType);
+			var intTime = this.baseRead();
 			if (intTime) {
 				return new Date(intTime + timeBasis);
 			}
 		},
 		write: function (time) {
-			this.binary.write(this.baseType, time - timeBasis);
+			this.baseWrite(time - timeBasis);
 		}
 	}),
 
-	FixedPoint: jBinary.Type({
+	FixedPoint: jBinary.Template({
 		params: ['baseType'],
 		init: function (baseType, shift) {
 			this.coef = 1 << shift;
 		},
 		read: function () {
-			return this.binary.read(this.baseType) / this.coef;
+			return this.baseRead() / this.coef;
 		},
 		write: function (value) {
-			this.binary.write(this.baseType, value * this.coef);
+			this.baseWrite(value * this.coef);
 		}
 	}),
 
@@ -418,12 +418,12 @@ var MP4 = {
 	}),
 
 	stsd: ['ArrayBox', jBinary.Template({
-		init: function () {
-			this.baseType = {soun: 'AudioSampleEntry', vide: 'VisualSampleEntry', meta: 'Box'}[this.binary.getContext(atomFilter('trak'))._handler_type] || 'SampleEntry';
+		getBaseType: function () {
+			return {soun: 'AudioSampleEntry', vide: 'VisualSampleEntry', meta: 'Box'}[this.binary.getContext(atomFilter('trak'))._handler_type] || 'SampleEntry';
 		},
 		write: function (value) {
 			var pos = this.binary.tell();
-			this.binary.write(this.baseType, value);
+			this.baseWrite(value);
 			var size = this.binary.tell() - pos;
 			this.binary.seek(pos, function () { this.write('uint32', size) });
 		}

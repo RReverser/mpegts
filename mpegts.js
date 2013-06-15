@@ -31,13 +31,10 @@ var MPEGTS = {
 		}
 	}),
 
-	FlagDependent: jBinary.Type({
+	FlagDependent: jBinary.Template({
 		params: ['flagField', 'baseType'],
 		read: function () {
 			return this.binary.read(['if', this.flagField, this.baseType]);
-		},
-		write: function () {
-			this.binary.write(this.baseType);
 		}
 	}),
 
@@ -185,11 +182,9 @@ var MPEGTS = {
 	},
 
 	File: jBinary.Type({
-		init: function () {
+		read: function () {
 			this.pat = {};
 			this.pmt = {};
-		},
-		read: function () {
 			return this.binary.inContext(this, function () {
 				return this.read(['array', 'Packet', this.view.byteLength / 188]);
 			});

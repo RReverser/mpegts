@@ -37,20 +37,16 @@
 
 			switch (data.type) {
 				case 'debug':
-					// console[data.action].apply(console, data.args);
+					console[data.action].apply(console, data.args);
 					return;
 
 				case 'video':
 					var video = document.createElement('video'), source = document.createElement('source');
 					source.type = 'video/mp4';
-					video.preload = 'auto';
 					video.appendChild(source);
-
-					video.src = source.src = data.url;
 					
 					video.addEventListener('canplaythrough', function () {
 						console.log('converted ' + descriptor);
-						this.currentTime = 0.02;
 						videos[data.index] = this;
 						if ((!currentVideo || currentVideo.ended) && data.index === nextIndex) {
 							this.play();
@@ -86,6 +82,9 @@
 						});
 					}
 
+					video.src = source.src = data.url;
+					video.load();
+
 					return;
 			}
 		});
@@ -98,7 +97,7 @@
 
 		function getMore() {
 			var ajax = new XMLHttpRequest();
-			var manifest = 'http://localhost/hls/live/203739/NASATV1_iOS_HD/Edge.m3u8';
+			var manifest = 'http://localhost/hls/live/203739/NASATV1_iOS_HD/Wifi.m3u8';
 			ajax.addEventListener('load', function () {
 				var originals =
 					this.responseText
