@@ -484,7 +484,7 @@ addEventListener('message', function (event) {
 		// console.timeEnd('build');
 
 		// console.time('generateURL');
-		var url = file.slice(0, file.tell()).toURL('video/mp4');
+		var url = file.slice(0, file.tell()).toURI('video/mp4');
 		// console.timeEnd('generateURL');
 
 		// console.timeEnd('convert');
