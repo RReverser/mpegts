@@ -19,7 +19,7 @@ var PES = {
 	}),
 
 	PESTimeStamp: jBinary.Template({
-		init: function (prefix) {
+		setParams: function (prefix) {
 			var skipBit = ['const', 1, 1, true];
 			this.baseType = {
 				_prefix: ['const', 4, prefix, true],

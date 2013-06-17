@@ -38,7 +38,7 @@ var H264 = {
 	}),
 
 	ScalingList: jBinary.Template({
-		init: function (size) {
+		setParams: function (size) {
 			this.baseType = ['array', { /* TODO: implement scaling list */ }, size];
 		}
 	}),

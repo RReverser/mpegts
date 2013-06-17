@@ -11,7 +11,7 @@ var MP4 = {
 	Rate: ['FixedPoint', 'int32', 16],
 
 	Dimensions: jBinary.Template({
-		init: function (itemType) {
+		setParams: function (itemType) {
 			this.baseType = {
 				horz: itemType,
 				vert: itemType
@@ -91,7 +91,7 @@ var MP4 = {
 
 	FixedPoint: jBinary.Template({
 		params: ['baseType'],
-		init: function (baseType, shift) {
+		setParams: function (baseType, shift) {
 			this.coef = 1 << shift;
 		},
 		read: function () {
@@ -144,7 +144,7 @@ var MP4 = {
 	Volume: ['FixedPoint', 'uint16', 8],
 
 	FBVersionable: jBinary.Template({
-		init: function (type0, type1) {
+		setParams: function (type0, type1) {
 			this.baseType = ['if', 'version', type1, type0];
 		}
 	}),
@@ -178,7 +178,7 @@ var MP4 = {
 	mdat: ['extend', 'BoxHeader', 'RawData'],
 
 	ParamSets: jBinary.Template({
-		init: function (numType) {
+		setParams: function (numType) {
 			this.baseType = ['DynamicArray', numType, jBinary.Type({
 				read: function () {
 					var length = this.binary.read('uint16');
@@ -358,7 +358,7 @@ var MP4 = {
 		depth: 'uint16',
 		_reserved3: ['const', 'uint16', -1]
 	}, jBinary.Type({
-		init: function () {
+		setParams: function () {
 			this.optional = {
 				cleanaperture: 'clap',
 				pixelaspectratio: 'pasp'
@@ -408,7 +408,7 @@ var MP4 = {
 	}),
 
 	ArrayBox: jBinary.Template({
-		init: function (entryType) {
+		setParams: function (entryType) {
 			this.baseType = ['extend', 'FullBox', {
 				entries: ['DynamicArray', 'uint32', entryType]
 			}];
@@ -669,7 +669,7 @@ var MP4 = {
 						'mpeg-surround'
 					]],
 					sampling_freq: jBinary.Type({
-						init: function () {
+						setParams: function () {
 							this.freqList = [96000, 88200, 64000, 48000, 44100, 32000, 24000, 22050, 16000, 12000, 11025, 8000, 7350];
 						},
 						read: function () {
