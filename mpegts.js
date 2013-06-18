@@ -62,16 +62,13 @@ var MPEGTS = {
 	},
 
 	PrivateSection: ['extend', {
-		pointerField: ['if', ['payloadStart', 1], 'uint8'],
+		pointerField: ['if', 'payloadStart', 'uint8'],
 		tableId: ['enum', 'uint8', ['PAT', 'CAT', 'PMT']],
 		isLongSection: 1,
 		isPrivate: 1,
 		_reserved: 2,
 		_sectionLength: 12
-	}, [
-		'if',
-		['isLongSection'],
-		{
+	}, ['if', 'isLongSection', {
 			tableIdExt: 'uint16',
 			_reserved: 2,
 			versionNumber: 5,

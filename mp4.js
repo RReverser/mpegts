@@ -493,9 +493,7 @@ var MP4 = {
 		_sample_count_to_stbl: function (context) {
 			this.binary.getContext(atomFilter('stbl'))._sample_count = context.sample_count;
 		},
-		sample_sizes: [
-			'if_not',
-			['sample_size'],
+		sample_sizes: ['if_not', 'sample_size',
 			['array', 'uint32', function (context) { return context.sample_count }]
 		]
 	}],

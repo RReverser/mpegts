@@ -88,7 +88,7 @@ var PES = {
 			_hasExtension: ['Flag', 'extension'],
 			dataLength: 'uint8',
 			_headerEnd: function (context) { return this.binary.tell() + context.dataLength },
-			pts: ['FlagDependent', '_hasPTS', ['if', ['_hasDTS'], ['PESTimeStamp', 3], ['PESTimeStamp', 2]]],
+			pts: ['FlagDependent', '_hasPTS', ['if', '_hasDTS', ['PESTimeStamp', 3], ['PESTimeStamp', 2]]],
 			dts: ['FlagDependent', '_hasDTS', ['PESTimeStamp', 1]],
 			_toHeaderEnd: function (context) { this.binary.seek(context._headerEnd) }
 		},
