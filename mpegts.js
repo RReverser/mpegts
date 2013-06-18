@@ -7,27 +7,31 @@ var MPEGTS = {
 		extension: 9
 	},
 
-	DynamicArray: jBinary.Type({
-		params: ['lengthType', 'itemType'],
+	DynamicArray: jBinary.Template({
+		setParams: function (lengthType, itemType) {
+			this.baseType = {
+				length: lengthType,
+				array: ['array', itemType, 'length']
+			};
+		},
 		read: function () {
-			var length = this.binary.read(this.lengthType);
-			return this.binary.read(['array', this.itemType, length]);
+			return this.baseRead().array;
 		},
 		write: function (array) {
-			this.binary.write(this.lengthType, array.length);
-			this.binary.write(['array', this.itemType], array);
+			this.baseWrite({
+				length: array.length,
+				array: array
+			});
 		}
 	}),
 
 	Field: ['DynamicArray', 'uint8', 'uint8'],
 
-	Flag: jBinary.Type({
-	    params: ['dependentField'],
-		read: function () {
-			return this.binary.read(1);
-		},
+	Flag: jBinary.Template({
+		baseType: 1,
+		params: ['dependentField'],
 		write: function (value, context) {
-			this.binary.write(1, (this.dependentField in context ? 1 : 0));
+			this.baseWrite(this.dependentField in context ? 1 : 0);
 		}
 	}),
 
@@ -61,6 +65,27 @@ var MPEGTS = {
 		_rawStream: ['blob', function () { return 188 - (this.binary.tell() % 188) }]
 	},
 
+	PATItem: ['array', {
+		programNumber: 'uint16',
+		_reserved: 3,
+		pid: 13
+	}, function (context) { return context._dataLength / 4 }],
+
+	PMTHeader: {
+		_reserved: 3,
+		pcrPID: 13,
+		_reserved2: 4,
+		programDescriptors: ['DynamicArray', 12, 'uint8']
+	},
+
+	PMTItem: {
+		streamType: 'uint8',
+		_reserved: 3,
+		elementaryPID: 13,
+		_reserved2: 4,
+		esInfo: ['DynamicArray', 12, 'uint8']
+	},
+
 	PrivateSection: ['extend', {
 		pointerField: ['if', 'payloadStart', 'uint8'],
 		tableId: ['enum', 'uint8', ['PAT', 'CAT', 'PMT']],
@@ -84,11 +109,7 @@ var MPEGTS = {
 
 					switch (this.binary.getContext(1).tableId) {
 						case 'PAT':
-							data = this.binary.read(['array', {
-								programNumber: 'uint16',
-								_reserved: 3,
-								pid: 13
-							}, dataLength / 4]);
+							data = this.binary.read('PATItem');
 
 							if (header.sectionNumber == 0) {
 								file.pat = {};
@@ -101,27 +122,15 @@ var MPEGTS = {
 							break;
 
 						case 'PMT':
-							data = this.binary.read({
-								_reserved: 3,
-								pcrPID: 13,
-								_reserved2: 4,
-								programDescriptors: ['DynamicArray', 12, 'uint8']
-							});
+							data = this.binary.read('PMTHeader');
 
 							data.mappings = [];
 
 							dataLength -= 4 + data.programDescriptors.length;
 
 							while (dataLength > 0) {
-								var mapping = this.binary.read({
-									streamType: 'uint8',
-									_reserved: 3,
-									elementaryPID: 13,
-									_reserved2: 4,
-									esInfo: ['DynamicArray', 12, 'uint8']
-								});
+								var mapping = this.binary.read('PMTItem');
 								data.mappings.push(mapping);
-
 								dataLength -= 5 + mapping.esInfo.length;
 							}
 
@@ -143,7 +152,7 @@ var MPEGTS = {
 
 			crc32: 'uint32'
 		},
-		['blob', function (context) { return context._sectionLength }]
+		['blob', '_sectionLength']
 	]],
 
 	Packet: {
@@ -178,17 +187,20 @@ var MPEGTS = {
 		_toEnd: function (context) { this.binary.seek(context._startof + 188) }
 	},
 
-	File: jBinary.Type({
+	File: jBinary.Template({
+		baseType: ['array', 'Packet'],
 		read: function () {
 			this.pat = {};
 			this.pmt = {};
+			var self = this;
 			return this.binary.inContext(this, function () {
-				return this.read(['array', 'Packet', this.view.byteLength / 188]);
+				return self.baseRead();
 			});
 		},
 		write: function (packets) {
+			var self = this;
 			this.binary.inContext(this, function () {
-				this.write(['array', 'Packet'], packets);
+				self.baseWrite(packets);
 			});
 		}
 	})

@@ -61,13 +61,12 @@ var MP4 = {
 			var header = this.binary.skip(0, function () {
 				return this.read('BoxHeader');
 			});
-			var box = header.type in this.binary.structure ? this.binary.read(header.type) : header;
+			var box = this.binary.read(header.type) || header;
 			if (box === header) console.log(header.type);
 			this.binary.seek(header._end);
 			return box;
 		},
 		write: function (box) {
-			if (!(box.type in this.binary.structure)) return;
 			this.binary.write(box.type, box);
 			var size = this.binary.tell() - box._begin;
 			this.binary.seek(box._begin, function () {
@@ -179,14 +178,19 @@ var MP4 = {
 
 	ParamSets: jBinary.Template({
 		setParams: function (numType) {
-			this.baseType = ['DynamicArray', numType, jBinary.Type({
+			this.baseType = ['DynamicArray', numType, jBinary.Template({
+				baseType: {
+					length: 'uint16',
+					paramSet: ['blob', 'length']
+				},
 				read: function () {
-					var length = this.binary.read('uint16');
-					return this.binary.read(['blob', length]);
+					return this.baseRead().paramSet;
 				},
 				write: function (paramSet) {
-					this.binary.write('uint16', paramSet.length);
-					this.binary.write('blob', paramSet);
+					this.baseWrite({
+						length: paramSet.length,
+						paramSet: paramSet
+					});
 				}
 			})];
 		}
@@ -342,17 +346,20 @@ var MP4 = {
 		resolution: ['Dimensions', 'Rate'],
 		_reserved2: ['skip', 4],
 		frame_count: ['const', 'uint16', 1],
-		compressorname: jBinary.Type({
+		compressorname: jBinary.Template({
+			baseType: {
+				length: 'uint8',
+				string: ['string', 'length'],
+				_skip: ['skip', function (context) { return 32 - 1 - context.length }]
+			},
 			read: function () {
-				var length = this.binary.read('uint8');
-				var name = this.binary.read(['string', length]);
-				this.binary.skip(32 - 1 - length);
-				return name;
+				return this.baseRead().string;
 			},
 			write: function (value) {
-				this.binary.write('uint8', value.length);
-				this.binary.write(['string', value.length], value);
-				this.binary.skip(32 - 1 - value.length);
+				this.baseWrite({
+					length: value.length,
+					string: value
+				});
 			}
 		}),
 		depth: 'uint16',
@@ -395,15 +402,21 @@ var MP4 = {
 		samplerate: 'Rate'
 	}, 'ChildAtoms'],
 
-	DynamicArray: jBinary.Type({
-		params: ['lengthType', 'itemType'],
+	DynamicArray: jBinary.Template({
+		setParams: function (lengthType, itemType) {
+			this.baseType = {
+				length: lengthType,
+				array: ['array', itemType, 'length']
+			};
+		},
 		read: function () {
-			var length = this.binary.read(this.lengthType);
-			return this.binary.read(['array', this.itemType, length]);
+			return this.baseRead().array;
 		},
 		write: function (array) {
-			this.binary.write(this.lengthType, array.length);
-			this.binary.write(['array', this.itemType], array);
+			this.baseWrite({
+				length: array.length,
+				array: array
+			});
 		}
 	}),
 
@@ -494,7 +507,7 @@ var MP4 = {
 			this.binary.getContext(atomFilter('stbl'))._sample_count = context.sample_count;
 		},
 		sample_sizes: ['if_not', 'sample_size',
-			['array', 'uint32', function (context) { return context.sample_count }]
+			['array', 'uint32', 'sample_count']
 		]
 	}],
 
@@ -510,7 +523,7 @@ var MP4 = {
 			jBinary.Template({
 				getBaseType: function (context) { return context.field_size }
 			}),
-			function (context) { return context.sample_count }
+			'sample_count'
 		]
 	}],
 
@@ -525,14 +538,16 @@ var MP4 = {
 	co64: ['ArrayBox', 'uint64'],
 
 	padb: ['extend', 'FullBox', {
-		pads: ['DynamicArray', 'uint32', jBinary.Type({
+		pads: ['DynamicArray', 'uint32', jBinary.Template({
+			baseType: {
+				_skip: ['const', 1, 0],
+				pad: 3
+			},
 			read: function () {
-				this.binary.read(1);
-				return this.binary.read(3);
+				return this.baseRead().pad;
 			},
 			write: function (pad) {
-				this.binary.write(1, 0);
-				this.binary.write(3, pad);
+				this.baseWrite({pad: pad});
 			}
 		})]
 	}],
@@ -698,17 +713,18 @@ var MP4 = {
 	})],
 
 	esds: ['extend', 'FullBox', {
-		sections: jBinary.Type({
+		sections: jBinary.Template({
+			baseType: 'esds_section',
 			read: function () {
 				var end = this.binary.getContext('_end')._end, sections = [];
 				while (this.binary.tell() < end) {
-					sections.push(this.binary.read('esds_section'));
+					sections.push(this.baseRead());
 				}
 				return sections;
 			},
 			write: function (sections) {
 				for (var i = 0, length = sections.length; i < length; i++) {
-					this.binary.write('esds_section', sections[i]);
+					this.baseWrite(sections[i]);
 				}
 			}
 		})

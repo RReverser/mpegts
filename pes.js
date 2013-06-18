@@ -1,13 +1,11 @@
 (function (exports) {
 
 var PES = {
-	Flag: jBinary.Type({
+	Flag: jBinary.Template({
+		baseType: 1,
 		params: ['dependentField'],
-		read: function () {
-			return this.binary.read(1);
-		},
 		write: function (value, context) {
-			this.binary.write(1, (this.dependentField in context ? 1 : 0));
+			this.baseWrite(this.dependentField in context ? 1 : 0);
 		}
 	}),
 
