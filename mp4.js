@@ -6,7 +6,7 @@ function toValue(prop, val) {
 }
 
 var MP4 = {
-	ShortName: ['string', 4],
+	ShortName: ['string0', 4],
 	
 	Rate: ['FixedPoint', 'int32', 16],
 
@@ -268,12 +268,12 @@ var MP4 = {
 
 	hdlr: ['extend', 'FullBox', {
 		_reserved: ['skip', 4],
-		handler_type: ['string', 4],
+		handler_type: 'ShortName',
 		_set_handler_type: function (context) {
 			this.binary.getContext(atomFilter('trak'))._handler_type = context.handler_type;
 		},
 		_reserved2: ['skip', 12],
-		name: 'string'
+		name: 'string0'
 	}],
 
 	minf: 'MultiBox',
@@ -314,15 +314,15 @@ var MP4 = {
 	}],
 
 	metx: ['extend', 'SampleEntry', {
-		content_encoding: 'string',
-		namespace: 'string',
-		schema_location: 'string',
+		content_encoding: 'string0',
+		namespace: 'string0',
+		schema_location: 'string0',
 		bitratebox: 'btrt'
 	}],
 
 	mett: ['extend', 'SampleEntry', {
-		content_encoding: 'string',
-		mime_format: 'string',
+		content_encoding: 'string0',
+		mime_format: 'string0',
 		bitratebox: 'btrt'
 	}],
 
@@ -490,12 +490,12 @@ var MP4 = {
 	dinf: 'MultiBox',
 
 	'url ': ['extend', 'FullBox', {
-		location: 'string'
+		location: 'string0'
 	}],
 
 	'urn ': ['extend', 'FullBox', {
-		name: 'string',
-		location: 'string'
+		name: 'string0',
+		location: 'string0'
 	}],
 
 	dref: ['ArrayBox', 'Box'],
