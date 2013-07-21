@@ -25,7 +25,7 @@ addEventListener('message', function (event) {
 	jBinary.loadData(msg.url, function (err, data) {
 		var mpegts = new jBinary(data, MPEGTS);
 
-		// console.time('convert');
+		console.time('convert');
 
 		// console.time('read');
 		var packets = mpegts.read('File');
@@ -192,19 +192,6 @@ addEventListener('message', function (event) {
 										vert: height
 									}
 								}],
-								edts: [{
-									atoms: {
-										elst: [{
-											version: 0,
-											flags: 0,
-											entries: [{
-												segment_duration: duration,
-												media_time: 0,
-												media_rate: 1
-											}]
-										}]
-									}
-								}],
 								mdia: [{
 									atoms: {
 										mdhd: [{
@@ -336,19 +323,6 @@ addEventListener('message', function (event) {
 									dimensions: {
 										horz: 0,
 										vert: 0
-									}
-								}],
-								edts: [{
-									atoms: {
-										elst: [{
-											version: 0,
-											flags: 0,
-											entries: [{
-												segment_duration: duration,
-												media_time: 0,
-												media_rate: 1
-											}]
-										}]
 									}
 								}],
 								mdia: [{
@@ -487,7 +461,7 @@ addEventListener('message', function (event) {
 		var url = file.slice(0, file.tell()).toURI('video/mp4');
 		// console.timeEnd('generateURL');
 
-		// console.timeEnd('convert');
+		console.timeEnd('convert');
 
 		postMessage({type: 'video', index: msg.index, original: msg.url, url: url});
 	});

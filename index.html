@@ -7,14 +7,20 @@
 	<canvas id="canvas"></canvas>
 
 	<script>
-		if (!('time' in console)) {
+		if (true || !('time' in console)) {
 			(function () {
-				var timeStarts = {}, nowHost = typeof performance !== 'undefined' && 'now' in performance ? performance : Date;
+				var timeStarts = {}, nowHost = typeof performance !== 'undefined' && 'now' in performance ? performance : Date, avg = window.avg = {};
 				console.time = function (id) {
 					timeStarts[id] = nowHost.now();
 				};
 				console.timeEnd = function (id) {
-					console.log(id + ': ' + (nowHost.now() - timeStarts[id]) + ' ms');
+					var delta = nowHost.now() - timeStarts[id];
+					if (!(id in avg)) {
+						avg[id] = {sum: 0, count: 0, valueOf: function () { return this.sum / this.count }};
+					}
+					avg[id].sum += delta;
+					avg[id].count++;
+					console.log(id + ': ' + delta + ' ms');
 					delete timeStarts[id];
 				};
 			})();
