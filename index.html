@@ -43,7 +43,7 @@
 
 			switch (data.type) {
 				case 'debug':
-					console[data.action].apply(console, data.args);
+					Function.prototype.apply.call(console[data.action], console, data.args);
 					return;
 
 				case 'video':
@@ -103,13 +103,13 @@
 
 		function getMore() {
 			var ajax = new XMLHttpRequest();
-			var manifest = 'http://localhost/hls/live/203739/NASATV1_iOS_HD/Wifi.m3u8';
+			var manifest = 'http://mediamotiononline.ios.internapcdn.net/mediamotiononline/inapcms/CMS16042/flash/16042_adaptive2.mp4/CCURstream678422.m3u8';
 			ajax.addEventListener('load', function () {
 				var originals =
 					this.responseText
 					.split(/\r?\n/)
 					.filter(RegExp.prototype.test.bind(/\.ts$/))
-					.map(function (url) { return url.replace('nasahd-i.akamaihd.net', 'localhost') });
+					.map(function (url) { return 'http://mediamotiononline.ios.internapcdn.net/mediamotiononline/inapcms/CMS16042/flash/16042_adaptive2.mp4/' + url });
 
 				originals = originals.slice(originals.lastIndexOf(lastOriginal) + 1);
 				lastOriginal = originals[originals.length - 1];
