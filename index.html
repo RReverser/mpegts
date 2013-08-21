@@ -114,9 +114,9 @@
 				originals = originals.slice(originals.lastIndexOf(lastOriginal) + 1);
 				lastOriginal = originals[originals.length - 1];
 
-				originals.forEach(function (url, index) {
-					worker.postMessage({url: url, index: sentVideos + index});
-				});
+				worker.postMessage(originals.map(function (url, index) {
+					return {url: url, index: sentVideos + index};
+				}));
 
 				sentVideos += originals.length;
 
