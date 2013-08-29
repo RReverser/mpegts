@@ -82,7 +82,7 @@
 						}
 					});
 
-					if (typeof URL !== 'undefined') {
+					if (video.src.slice(0, 5) === 'blob:') {
 						video.addEventListener('ended', function () {
 							URL.revokeObjectURL(this.src);
 						});

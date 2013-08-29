@@ -23,7 +23,7 @@ var console = {};
 addEventListener('message', function (event) {
 	async.eachSeries(event.data, function (msg, callback) {
 		jBinary.loadData(msg.url, function (err, data) {
-			callback(err, data);
+			callback(err);
 
 			var mpegts = new jBinary(data, MPEGTS);
 
