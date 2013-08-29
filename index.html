@@ -2,33 +2,61 @@
 <html>
 <head>
 	<title>MPEG-TS Parser demo</title>
+	<!--[if IE 9]>
+	<script>
+		function Worker(src) {
+			var script = document.createElement('script');
+			script.src = src;
+			document.head.appendChild(script);
+			return self;
+		}
+
+		function postMessage(msg) {
+			var evt = document.createEvent('Event');
+			evt.initEvent('message', true, true);
+			evt.data = msg;
+			setTimeout(function () {
+				dispatchEvent(evt);
+			}, 0);
+		}
+
+		function importScripts() {
+			for (var i = 0, length = arguments.length; i < length; i++) {
+				var xhr = new XMLHttpRequest();
+				xhr.open('GET', arguments[i], false);
+				xhr.send();
+				new Function(xhr.responseText)();
+			}
+		}
+	</script>
+	<![endif]-->
 </head>
 <body>
 	<canvas id="canvas"></canvas>
 
 	<script>
-		if (true || !('time' in console)) {
-			(function () {
-				var timeStarts = {}, nowHost = typeof performance !== 'undefined' && 'now' in performance ? performance : Date, avg = window.avg = {};
-				console.time = function (id) {
+		if (!('time' in console)) {
+			(function (nowHost) {
+				var timeStarts = {}, avg = {};
+				this.time = function (id) {
 					timeStarts[id] = nowHost.now();
 				};
-				console.timeEnd = function (id) {
+				this.timeEnd = function (id) {
 					var delta = nowHost.now() - timeStarts[id];
 					if (!(id in avg)) {
 						avg[id] = {sum: 0, count: 0, valueOf: function () { return this.sum / this.count }};
 					}
 					avg[id].sum += delta;
 					avg[id].count++;
-					console.log(id + ': ' + delta + ' ms');
+					this.log(id + ': ' + delta + ' ms');
 					delete timeStarts[id];
 				};
-			})();
+			}).call(console, typeof performance !== 'undefined' && 'now' in performance ? performance : Date);
 		}
 
 		var worker = new Worker('worker.js'), nextIndex = 0, sentVideos = 0, currentVideo = null, videos = [], lastOriginal, canvas = document.getElementById('canvas'), context = canvas.getContext('2d');
 
-		var requestAnimationFrame = window.requestAnimationFrame || window.mozRequestAnimationFrame || window.webkitRequestAnimationFrame || window.msRequestAnimationFrame || setTimeout;
+		window.requestAnimationFrame = window.requestAnimationFrame || window.mozRequestAnimationFrame || window.webkitRequestAnimationFrame || window.msRequestAnimationFrame || setTimeout;
 
 		function nextFrame() {
 			if (currentVideo.paused || currentVideo.ended) {
@@ -50,21 +78,16 @@
 					var video = document.createElement('video'), source = document.createElement('source');
 					source.type = 'video/mp4';
 					video.appendChild(source);
-					
-					video.addEventListener('canplaythrough', function () {
-						console.log('converted ' + descriptor);
-						videos[data.index] = this;
-						if ((!currentVideo || currentVideo.ended) && data.index === nextIndex) {
-							this.play();
+
+					video.addEventListener('loadedmetadata', function () {
+						if (canvas.width !== this.videoWidth || canvas.height !== this.videoHeight) {
+							canvas.width = this.width = this.videoWidth;
+							canvas.height = this.height = this.videoHeight;
 						}
 					});
 
 					video.addEventListener('play', function () {
 						if (currentVideo !== this) {
-							if (!currentVideo) {
-								canvas.width = this.width = this.videoWidth;
-								canvas.height = this.height = this.videoHeight;
-							}
 							console.log('playing ' + descriptor);
 							currentVideo = this;
 							nextIndex++;
@@ -81,7 +104,6 @@
 							videos[nextIndex].play();
 						}
 					});
-
 					if (video.src.slice(0, 5) === 'blob:') {
 						video.addEventListener('ended', function () {
 							URL.revokeObjectURL(this.src);
@@ -90,6 +112,14 @@
 
 					video.src = source.src = data.url;
 					video.load();
+
+					(function canplaythrough() {
+						console.log('converted ' + descriptor);
+						videos[data.index] = this;
+						if ((!currentVideo || currentVideo.ended) && data.index === nextIndex) {
+							this.play();
+						}
+					}).call(video);
 
 					return;
 			}
