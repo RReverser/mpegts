@@ -96,7 +96,7 @@ var PES = {
 				return this.baseRead();
 			} catch (e) {
 				this.binary.seek(pos);
-				this.binary._bitShift = 0;
+				this.binary.view.alignBy();
 			}
 		}
 	}), {
