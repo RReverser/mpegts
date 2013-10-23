@@ -9,7 +9,7 @@ importScripts(
 	'async.js'
 );
 
-if (!console) {
+if (typeof console === 'undefined') {
 	console = {};
 	['log', 'time', 'timeEnd'].forEach(function (action) {
 		console[action] = function () {
