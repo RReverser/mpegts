@@ -23,7 +23,7 @@
 	window.requestAnimationFrame = window.requestAnimationFrame || window.mozRequestAnimationFrame || window.webkitRequestAnimationFrame || window.msRequestAnimationFrame || setTimeout;
 
 	var script = scripts[scripts.length - 1],
-		worker = new Worker('worker.js'),
+		worker = new Worker('mpegts-to-mp4/worker.js'),
 		nextIndex = 0,
 		sentVideos = 0,
 		currentVideo = null,
