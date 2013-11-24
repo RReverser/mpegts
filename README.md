@@ -15,3 +15,6 @@ but still working in latest Firefox versions and IE10+.
 
 Please note that demo uses 3rd-party HLS demo source and service [http://www.corsproxy.com/](http://www.corsproxy.com/) for proxying it with
 needed Cross-Origin-Request headers for browsers to allow chunk downloading, so it may be unstable.
+
+Screenshot of demo page:
+![Screenshot](http://rreverser.github.io/mpegts/screenshot.png)
