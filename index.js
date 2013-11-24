@@ -1,4 +1,4 @@
-(function (script) {
+(function (scripts) {
 	if (!('time' in console)) {
 		(function (nowHost) {
 			var timeStarts = {}, avg = {};
@@ -22,13 +22,14 @@
 
 	window.requestAnimationFrame = window.requestAnimationFrame || window.mozRequestAnimationFrame || window.webkitRequestAnimationFrame || window.msRequestAnimationFrame || setTimeout;
 
-	var worker = new Worker('worker.js'),
+	var script = scripts[scripts.length - 1],
+		worker = new Worker('worker.js'),
 		nextIndex = 0,
 		sentVideos = 0,
 		currentVideo = null,
 		videos = [],
 		lastOriginal,
-		canvas = document.getElementById(script.getAttribute('canvas')),
+		canvas = document.getElementById(script.getAttribute('data-canvas')),
 		manifest = script.getAttribute('data-hls'),
 		context = canvas.getContext('2d');
 
@@ -152,4 +153,4 @@
 	}
 
 	getMore();
-})(document.querySelector('script:last-of-type'));
+})(document.getElementsByTagName('script'));
