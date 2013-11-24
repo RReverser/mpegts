@@ -1,4 +1,5 @@
 (function (scripts) {
+	// console.time[End]() polyfill
 	if (!('time' in console)) {
 		(function (nowHost) {
 			var timeStarts = {}, avg = {};
@@ -20,8 +21,10 @@
 		}).call(console, typeof performance !== 'undefined' && 'now' in performance ? performance : Date);
 	}
 
+	// requestAnimationFrame polyfill
 	window.requestAnimationFrame = window.requestAnimationFrame || window.mozRequestAnimationFrame || window.webkitRequestAnimationFrame || window.msRequestAnimationFrame || setTimeout;
 
+	// preconfiguration using <script>'s data-attributes values
 	var script = scripts[scripts.length - 1],
 		worker = new Worker('mpegts-to-mp4/worker.js'),
 		nextIndex = 0,
@@ -33,6 +36,7 @@
 		manifest = script.getAttribute('data-hls'),
 		context = canvas.getContext('2d');
 
+	// drawing new frame
 	function nextFrame() {
 		if (currentVideo.paused || currentVideo.ended) {
 			return;
@@ -45,10 +49,12 @@
 		var data = event.data, descriptor = '#' + data.index + ': ' + data.original;
 
 		switch (data.type) {
+			// got debug message from worker
 			case 'debug':
 				Function.prototype.apply.call(console[data.action], console, data.args);
 				return;
 
+			// got new converted MP4 video data
 			case 'video':
 				var video = document.createElement('video'), source = document.createElement('source');
 				source.type = 'video/mp4';
@@ -63,6 +69,14 @@
 
 				video.addEventListener('play', function () {
 					if (currentVideo !== this) {
+						if (!currentVideo) {
+							// UI initialization magic to be left in main HTML for unobtrusiveness
+							new Function(script.text).call({
+								worker: worker,
+								canvas: canvas,
+								get currentVideo() { return currentVideo }
+							});
+						}
 						console.log('playing ' + descriptor);
 						currentVideo = this;
 						nextIndex++;
@@ -100,12 +114,7 @@
 		}
 	});
 
-	canvas.addEventListener('click', function () {
-		if (currentVideo) {
-			currentVideo.paused ? currentVideo.play() : currentVideo.pause();
-		}
-	});
-
+	// relative URL resolver
 	var resolveURL = (function () {
 		var doc = document,
 			old_base = doc.getElementsByTagName('base')[0],
@@ -128,6 +137,7 @@
 		};
 	})();
 
+	// loading more videos from manifest
 	function getMore() {
 		var ajax = new XMLHttpRequest();
 		ajax.addEventListener('load', function () {
