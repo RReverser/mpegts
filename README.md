@@ -28,4 +28,4 @@ needed Cross-Origin-Request headers for browsers to allow chunk downloading, so 
 
 Screenshot of demo page
 -----------------------
-![Screenshot](http://rreverser.github.io/mpegts/screenshot.png?)
+[![Screenshot](http://rreverser.github.io/mpegts/screenshot.png?)](http://rreverser.github.io/mpegts/)
