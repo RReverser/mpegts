@@ -17,4 +17,4 @@ Please note that demo uses 3rd-party HLS demo source and service [http://www.cor
 needed Cross-Origin-Request headers for browsers to allow chunk downloading, so it may be unstable.
 
 Screenshot of demo page:
-![Screenshot](http://rreverser.github.io/mpegts/screenshot.png)
+![Screenshot](http://rreverser.github.io/mpegts/screenshot.png?)
