@@ -1,6 +1,6 @@
 importScripts(
-	'/jDataView/src/jdataview.js',
-	'/jBinary/src/jbinary.js',
+	'//jdataview.github.io/dist/jdataview.js',
+	'//jdataview.github.io/dist/jbinary.js',
 	'mpegts.js',
 	'mp4.js',
 	'pes.js',
