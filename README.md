@@ -1,4 +1,4 @@
-HTTP Live Streaming JavaScript converter and player
+HTTP Live Streaming JavaScript player
 ======
 
 What's this?
