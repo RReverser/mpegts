@@ -9,6 +9,7 @@ importScripts(
 	'async.js'
 );
 
+// polyfilling Worker's console object
 if (typeof console === 'undefined') {
 	console = {};
 	['log', 'time', 'timeEnd'].forEach(function (action) {
@@ -30,7 +31,11 @@ if (typeof console === 'undefined') {
 			this.timeEnd = function (id) {
 				var delta = nowHost.now() - timeStarts[id];
 				if (!(id in avg)) {
-					avg[id] = {sum: 0, count: 0, valueOf: function () { return this.sum / this.count }};
+					avg[id] = {
+						sum: 0,
+						count: 0,
+						valueOf: function () { return this.sum / this.count }
+					};
 				}
 				avg[id].sum += delta;
 				avg[id].count++;
@@ -42,8 +47,10 @@ if (typeof console === 'undefined') {
 }
 
 addEventListener('message', function (event) {
+	// processing received sources one by one
 	async.eachSeries(event.data, function (msg, callback) {
 		jBinary.loadData(msg.url, function (err, data) {
+			// tell async we can load next one
 			callback(err);
 			if (err) return;
 
@@ -51,11 +58,9 @@ addEventListener('message', function (event) {
 
 			console.time('convert');
 
-			// console.time('read');
 			var packets = mpegts.read('File');
-			// console.timeEnd('read');
-
-			// console.time('getStream');
+			
+			// extracting and concatenating raw stream parts
 			var stream = new jDataView(mpegts.view.byteLength);
 			for (var i = 0, length = packets.length; i < length; i++) {
 				var packet = packets[i], adaptation = packet.adaptationField, payload = packet.payload;
@@ -63,21 +68,28 @@ addEventListener('message', function (event) {
 					stream.writeBytes(payload._rawStream);
 				}
 			}
-			// console.timeEnd('getStream');
-
-			// console.time('filter');
-			var pesStream = new jBinary(stream.slice(0, stream.tell()), PES), audioStream = new jBinary(stream.byteLength, ADTS), samples = [], audioSamples = [];
+			
+			var pesStream = new jBinary(stream.slice(0, stream.tell()), PES),
+				audioStream = new jBinary(stream.byteLength, ADTS),
+				samples = [],
+				audioSamples = [];
+			
 			stream = new jDataView(stream.byteLength);
-			// console.log(pesStream.toURL());
+			
 			while (pesStream.tell() < pesStream.view.byteLength) {
 				var packet = pesStream.read('PESPacket');
-				// console.log(packet);
+				
 				if (packet.streamId === 0xC0) {
+					// 0xC0 means we have got first audio stream
 					audioStream.write('blob', packet.data);
 				} else
 				if (packet.streamId === 0xE0) {
-					var nalStream = new jBinary(packet.data, H264), curSample = {offset: stream.tell(), pts: packet.pts, dts: packet.dts || packet.pts};
+					var nalStream = new jBinary(packet.data, H264),
+						curSample = {offset: stream.tell(), pts: packet.pts, dts: packet.dts || packet.pts};
+					
 					samples.push(curSample);
+					
+					// collecting info from H.264 NAL units
 					while (nalStream.tell() < nalStream.view.byteLength) {
 						var nalUnit = nalStream.read('NALUnit');
 						switch (nalUnit[0] & 0x1F) {
@@ -111,9 +123,19 @@ addEventListener('message', function (event) {
 					}
 				}
 			}
+			
 			samples.push({offset: stream.tell()});
 
-			var sizes = [], dtsDiffs = [], accessIndexes = [], pts_dts_Diffs = [], current = samples[0], frameRate = {sum: 0, count: 0}, duration = 0;
+			var sizes = [],
+				dtsDiffs = [],
+				accessIndexes = [],
+				pts_dts_Diffs = [],
+				current = samples[0],
+				frameRate = {sum: 0, count: 0},
+				duration = 0;
+			
+			// calculating PTS/DTS differences and collecting keyframes
+			
 			for (var i = 0, length = samples.length - 1; i < length; i++) {
 				var next = samples[i + 1];
 				sizes.push(next.offset - current.offset);
@@ -136,7 +158,9 @@ addEventListener('message', function (event) {
 				});
 				current = next;
 			}
+			
 			frameRate = frameRate.sum / frameRate.count;
+			
 			for (var i = 0, length = dtsDiffs.length; i < length; i++) {
 				if (dtsDiffs[i] === undefined) {
 					dtsDiffs[i] = {first_chunk: i + 1, sample_count: 1, sample_delta: frameRate};
@@ -144,19 +168,32 @@ addEventListener('message', function (event) {
 					//samples[i + 1].dts = samples[i].dts + frameRate;
 				}
 			}
+			
+			// checking if DTS differences are same everywhere to pack them into one item
+			
 			var dtsDiffsSame = true;
+			
 			for (var i = 1, length = dtsDiffs.length; i < length; i++) {
 				if (dtsDiffs[i].sample_delta !== dtsDiffs[0].sample_delta) {
 					dtsDiffsSame = false;
 					break;
 				}
 			}
+			
 			if (dtsDiffsSame) {
 				dtsDiffs = [{first_chunk: 1, sample_count: sizes.length, sample_delta: dtsDiffs[0].sample_delta}];
 			}
 
-			var audioStart = stream.tell(), audioSize = audioStream.tell(), audioSizes = [], audioHeader, maxAudioSize = 0;
+			// building audio metadata
+
+			var audioStart = stream.tell(),
+				audioSize = audioStream.tell(),
+				audioSizes = [],
+				audioHeader,
+				maxAudioSize = 0;
+				
 			audioStream.seek(0);
+			
 			while (audioStream.tell() < audioSize) {
 				audioHeader = audioStream.read('ADTSPacket');
 				audioSizes.push(audioHeader.data.length);
@@ -166,10 +203,10 @@ addEventListener('message', function (event) {
 				stream.writeBytes(audioHeader.data);
 			}
 
-			// console.timeEnd('filter');
+			// generating resulting MP4
 
-			// console.time('build');
 			var file = new jBinary(stream.byteLength, MP4);
+			
 			file.write('File', {
 				ftyp: [{
 					major_brand: 'isom',
@@ -479,12 +516,9 @@ addEventListener('message', function (event) {
 					}
 				}]
 			});
-			// console.timeEnd('build');
-
-			// console.time('generateURL');
+			
 			var url = file.slice(0, file.tell()).toURI('video/mp4');
-			// console.timeEnd('generateURL');
-
+			
 			console.timeEnd('convert');
 
 			postMessage({type: 'video', index: msg.index, original: msg.url, url: url});
