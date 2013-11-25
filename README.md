@@ -10,7 +10,7 @@ Web Worker and playing them one by one in main thread.
 How does it work?
 -----------------
 Conversion is done using [jBinary](https://github.com/jDataView/jBinary) library with programmatically described data structures
-according to ISO 13818-*, ISO-14496-12 and ITU-T H.222.0 specifications.
+according to ISO 13818-1, ISO-14496-2, ISO-14496-12 and ITU-T H.222.0 specifications.
 
 Where I can see that?
 ---------------------
