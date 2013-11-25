@@ -12,10 +12,6 @@ How does it work?
 Conversion is done using [jBinary](https://github.com/jDataView/jBinary) library with programmatically described data structures
 according to ISO 13818-1, ISO-14496-2, ISO-14496-12 and ITU-T H.222.0 specifications.
 
-Where I can see that?
----------------------
-Check out [http://rreverser.github.io/mpegts/](http://rreverser.github.io/mpegts/) for live demo.
-
 Where does it work?
 -------------------
 Works best in Chrome (stable branch), having more noticable lags when switching videos
@@ -26,6 +22,9 @@ Disclaimer
 Please note that demo uses 3rd-party HLS demo source and service [http://www.corsproxy.com/](http://www.corsproxy.com/) for proxying it with
 needed Cross-Origin-Request headers for browsers to allow chunk downloading, so it may be unstable.
 
-Screenshot of demo page
------------------------
+Where I can see that?
+---------------------
+Check out [http://rreverser.github.io/mpegts/](http://rreverser.github.io/mpegts/) for live demo.
+
+Screenshot:
 [![Screenshot](http://rreverser.github.io/mpegts/screenshot.png?)](http://rreverser.github.io/mpegts/)
