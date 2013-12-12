@@ -4,12 +4,12 @@ HTTP Live Streaming JavaScript player
 What's this?
 ------------
 This is [Apple HTTP Live Streaming](http://developer.apple.com/streaming/) JavaScript player created by
-performing realtime conversion of MPEG-TS video chunks to MPEG-4 in parallel thread using
-Web Worker and playing them one by one in main thread.
+performing realtime conversion of MPEG-TS video chunks to MPEG-4 in separate thread using
+Web Worker and playing them in order in main thread.
 
 How does it work?
 -----------------
-Conversion is done using [jBinary](https://github.com/jDataView/jBinary) library with programmatically described data structures
+Conversion is done using [jBinary](https://github.com/jDataView/jBinary) binary manipulation library with programmatically described data structures
 according to ISO 13818-1, ISO-14496-2, ISO-14496-12 and ITU-T H.222.0 specifications.
 
 Where does it work?
