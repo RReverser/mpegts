@@ -1,4 +1,4 @@
-HTTP Live Streaming JavaScript player
+HTTP Live Streaming JavaScript player [![Bitdeli Badge](https://d2weczhvl823v0.cloudfront.net/RReverser/mpegts/trend.png)](https://bitdeli.com/free "Bitdeli Badge")
 ======
 
 What's this?
