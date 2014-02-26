@@ -207,32 +207,7 @@ addEventListener('message', function (event) {
 
 			var file = new jBinary(stream.byteLength, MP4);
 			
-			file.write('File', {
-				ftyp: [{
-					major_brand: 'isom',
-					minor_version: 512,
-					compatible_brands: ['isom', 'iso2', 'avc1', 'mp41']
-				}],
-				mdat: [{
-					_rawData: stream.getBytes(stream.tell(), 0)
-				}],
-				moov: [{
-					atoms: {
-						mvhd: [{
-							version: 0,
-							flags: 0,
-							timescale: 90000,
-							duration: duration,
-							rate: 1,
-							volume: 1,
-							matrix: {
-								a: 1, b: 0, x: 0,
-								c: 0, d: 1, y: 0,
-								u: 0, v: 0, w: 1
-							},
-							next_track_ID: 2
-						}],
-						trak: [
+			var trak_data = [
 							{
 								atoms: {
 									tkhd: [{
@@ -366,7 +341,9 @@ addEventListener('message', function (event) {
 									}]
 								}
 							},
-							{
+						];			
+			if (audioSize > 0) {
+				var trak_audio = {
 								atoms: {
 									tkhd: [{
 										version: 0,
@@ -511,8 +488,36 @@ addEventListener('message', function (event) {
 										}
 									}]
 								}
-							}
-						]
+							};
+				trak_data.push(trak_audio);
+			};
+			
+			file.write('File', {
+				ftyp: [{
+					major_brand: 'isom',
+					minor_version: 512,
+					compatible_brands: ['isom', 'iso2', 'avc1', 'mp41']
+				}],
+				mdat: [{
+					_rawData: stream.getBytes(stream.tell(), 0)
+				}],
+				moov: [{
+					atoms: {
+						mvhd: [{
+							version: 0,
+							flags: 0,
+							timescale: 90000,
+							duration: duration,
+							rate: 1,
+							volume: 1,
+							matrix: {
+								a: 1, b: 0, x: 0,
+								c: 0, d: 1, y: 0,
+								u: 0, v: 0, w: 1
+							},
+							next_track_ID: 2
+						}],
+						trak: trak_data,
 					}
 				}]
 			});
