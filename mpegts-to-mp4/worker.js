@@ -207,289 +207,287 @@ addEventListener('message', function (event) {
 
 			var file = new jBinary(stream.byteLength, MP4);
 			
-			var trak_data = [
-							{
+			var trak = [{
+				atoms: {
+					tkhd: [{
+						version: 0,
+						flags: 15,
+						track_ID: 1,
+						duration: duration,
+						layer: 0,
+						alternate_group: 0,
+						volume: 1,
+						matrix: {
+							a: 1, b: 0, x: 0,
+							c: 0, d: 1, y: 0,
+							u: 0, v: 0, w: 1
+						},
+						dimensions: {
+							horz: width,
+							vert: height
+						}
+					}],
+					mdia: [{
+						atoms: {
+							mdhd: [{
+								version: 0,
+								flags: 0,
+								timescale: 90000,
+								duration: duration,
+								lang: 'und'
+							}],
+							hdlr: [{
+								version: 0,
+								flags: 0,
+								handler_type: 'vide',
+								name: 'VideoHandler'
+							}],
+							minf: [{
 								atoms: {
-									tkhd: [{
+									vmhd: [{
 										version: 0,
-										flags: 15,
-										track_ID: 1,
-										duration: duration,
-										layer: 0,
-										alternate_group: 0,
-										volume: 1,
-										matrix: {
-											a: 1, b: 0, x: 0,
-											c: 0, d: 1, y: 0,
-											u: 0, v: 0, w: 1
-										},
-										dimensions: {
-											horz: width,
-											vert: height
+										flags: 1,
+										graphicsmode: 0,
+										opcolor: {r: 0, g: 0, b: 0}
+									}],
+									dinf: [{
+										atoms: {
+											dref: [{
+												version: 0,
+												flags: 0,
+												entries: [{
+													type: 'url ',
+													version: 0,
+													flags: 1,
+													location: ''
+												}]
+											}]
 										}
 									}],
-									mdia: [{
+									stbl: [{
 										atoms: {
-											mdhd: [{
+											stsd: [{
 												version: 0,
 												flags: 0,
-												timescale: 90000,
-												duration: duration,
-												lang: 'und'
+												entries: [{
+													type: 'avc1',
+													data_reference_index: 1,
+													dimensions: {
+														horz: width,
+														vert: height
+													},
+													resolution: {
+														horz: 72,
+														vert: 72
+													},
+													frame_count: 1,
+													compressorname: '',
+													depth: 24,
+													atoms: {
+														avcC: [{
+															version: 1,
+															profileIndication: spsInfo.profile_idc,
+															profileCompatibility: parseInt(spsInfo.constraint_set_flags.join(''), 2),
+															levelIndication: spsInfo.level_idc,
+															lengthSizeMinusOne: 3,
+															seqParamSets: [sps],
+															pictParamSets: [pps]
+														}]
+													}
+												}]
 											}],
-											hdlr: [{
+											stts: [{
 												version: 0,
 												flags: 0,
-												handler_type: 'vide',
-												name: 'VideoHandler'
+												entries: dtsDiffs
 											}],
-											minf: [{
-												atoms: {
-													vmhd: [{
+											stss: [{
+												version: 0,
+												flags: 0,
+												entries: accessIndexes
+											}],
+											ctts: [{
+												version: 0,
+												flags: 0,
+												entries: pts_dts_Diffs
+											}],
+											stsc: [{
+												version: 0,
+												flags: 0,
+												entries: [{
+													first_chunk: 1,
+													samples_per_chunk: sizes.length,
+													sample_description_index: 1
+												}]
+											}],
+											stsz: [{
+												version: 0,
+												flags: 0,
+												sample_size: 0,
+												sample_count: sizes.length,
+												sample_sizes: sizes
+											}],
+											stco: [{
+												version: 0,
+												flags: 0,
+												entries: [0x28]
+											}]
+										}
+									}]
+								}
+							}]
+						}
+					}]
+				}
+			}];
+
+			if (audioSize > 0) {
+				trak.push({
+					atoms: {
+						tkhd: [{
+							version: 0,
+							flags: 15,
+							track_ID: 2,
+							duration: duration,
+							layer: 0,
+							alternate_group: 1,
+							volume: 1,
+							matrix: {
+								a: 1, b: 0, x: 0,
+								c: 0, d: 1, y: 0,
+								u: 0, v: 0, w: 1
+							},
+							dimensions: {
+								horz: 0,
+								vert: 0
+							}
+						}],
+						mdia: [{
+							atoms: {
+								mdhd: [{
+									version: 0,
+									flags: 0,
+									timescale: 90000,
+									duration: duration,
+									lang: 'eng'
+								}],
+								hdlr: [{
+									version: 0,
+									flags: 0,
+									handler_type: 'soun',
+									name: 'SoundHandler'
+								}],
+								minf: [{
+									atoms: {
+										smhd: [{
+											version: 0,
+											flags: 0,
+											balance: 0
+										}],
+										dinf: [{
+											atoms: {
+												dref: [{
+													version: 0,
+													flags: 0,
+													entries: [{
+														type: 'url ',
 														version: 0,
 														flags: 1,
-														graphicsmode: 0,
-														opcolor: {r: 0, g: 0, b: 0}
-													}],
-													dinf: [{
+														location: ''
+													}]
+												}]
+											}
+										}],
+										stbl: [{
+											atoms: {
+												stsd: [{
+													version: 0,
+													flags: 0,
+													entries: [{
+														type: 'mp4a',
+														data_reference_index: 1,
+														channelcount: 2,
+														samplesize: 16,
+														samplerate: 22050,
 														atoms: {
-															dref: [{
+															esds: [{
 																version: 0,
 																flags: 0,
-																entries: [{
-																	type: 'url ',
-																	version: 0,
-																	flags: 1,
-																	location: ''
-																}]
-															}]
-														}
-													}],
-													stbl: [{
-														atoms: {
-															stsd: [{
-																version: 0,
-																flags: 0,
-																entries: [{
-																	type: 'avc1',
-																	data_reference_index: 1,
-																	dimensions: {
-																		horz: width,
-																		vert: height
+																sections: [
+																	{
+																		descriptor_type: 3,
+																		ext_type: 128,
+																		length: 34,
+																		es_id: 2,
+																		stream_priority: 0
 																	},
-																	resolution: {
-																		horz: 72,
-																		vert: 72
+																	{
+																		descriptor_type: 4,
+																		ext_type: 128,
+																		length: 20,
+																		type: 'mpeg4_audio',
+																		stream_type: 'audio',
+																		upstream_flag: 0,
+																		buffer_size: 0,
+																		maxBitrate: maxAudioSize / (duration / 90000 / audioSizes.length),
+																		avgBitrate: (stream.tell() - audioStart) / (duration / 90000)
 																	},
-																	frame_count: 1,
-																	compressorname: '',
-																	depth: 24,
-																	atoms: {
-																		avcC: [{
-																			version: 1,
-																			profileIndication: spsInfo.profile_idc,
-																			profileCompatibility: parseInt(spsInfo.constraint_set_flags.join(''), 2),
-																			levelIndication: spsInfo.level_idc,
-																			lengthSizeMinusOne: 3,
-																			seqParamSets: [sps],
-																			pictParamSets: [pps]
-																		}]
+																	{
+																		descriptor_type: 5,
+																		ext_type: 128,
+																		length: 2,
+																		audio_profile: audioHeader.profileMinusOne + 1,
+																		sampling_freq: audioHeader.samplingFreq,
+																		channelConfig: audioHeader.channelConfig
+																	},
+																	{
+																		descriptor_type: 6,
+																		ext_type: 128,
+																		length: 1,
+																		sl: 2
 																	}
-																}]
-															}],
-															stts: [{
-																version: 0,
-																flags: 0,
-																entries: dtsDiffs
-															}],
-															stss: [{
-																version: 0,
-																flags: 0,
-																entries: accessIndexes
-															}],
-															ctts: [{
-																version: 0,
-																flags: 0,
-																entries: pts_dts_Diffs
-															}],
-															stsc: [{
-																version: 0,
-																flags: 0,
-																entries: [{
-																	first_chunk: 1,
-																	samples_per_chunk: sizes.length,
-																	sample_description_index: 1
-																}]
-															}],
-															stsz: [{
-																version: 0,
-																flags: 0,
-																sample_size: 0,
-																sample_count: sizes.length,
-																sample_sizes: sizes
-															}],
-															stco: [{
-																version: 0,
-																flags: 0,
-																entries: [0x28]
+																]
 															}]
 														}
 													}]
-												}
-											}]
-										}
-									}]
-								}
-							},
-						];			
-			if (audioSize > 0) {
-				var trak_audio = {
-								atoms: {
-									tkhd: [{
-										version: 0,
-										flags: 15,
-										track_ID: 2,
-										duration: duration,
-										layer: 0,
-										alternate_group: 1,
-										volume: 1,
-										matrix: {
-											a: 1, b: 0, x: 0,
-											c: 0, d: 1, y: 0,
-											u: 0, v: 0, w: 1
-										},
-										dimensions: {
-											horz: 0,
-											vert: 0
-										}
-									}],
-									mdia: [{
-										atoms: {
-											mdhd: [{
-												version: 0,
-												flags: 0,
-												timescale: 90000,
-												duration: duration,
-												lang: 'eng'
-											}],
-											hdlr: [{
-												version: 0,
-												flags: 0,
-												handler_type: 'soun',
-												name: 'SoundHandler'
-											}],
-											minf: [{
-												atoms: {
-													smhd: [{
-														version: 0,
-														flags: 0,
-														balance: 0
-													}],
-													dinf: [{
-														atoms: {
-															dref: [{
-																version: 0,
-																flags: 0,
-																entries: [{
-																	type: 'url ',
-																	version: 0,
-																	flags: 1,
-																	location: ''
-																}]
-															}]
-														}
-													}],
-													stbl: [{
-														atoms: {
-															stsd: [{
-																version: 0,
-																flags: 0,
-																entries: [{
-																	type: 'mp4a',
-																	data_reference_index: 1,
-																	channelcount: 2,
-																	samplesize: 16,
-																	samplerate: 22050,
-																	atoms: {
-																		esds: [{
-																			version: 0,
-																			flags: 0,
-																			sections: [
-																				{
-																					descriptor_type: 3,
-																					ext_type: 128,
-																					length: 34,
-																					es_id: 2,
-																					stream_priority: 0
-																				},
-																				{
-																					descriptor_type: 4,
-																					ext_type: 128,
-																					length: 20,
-																					type: 'mpeg4_audio',
-																					stream_type: 'audio',
-																					upstream_flag: 0,
-																					buffer_size: 0,
-																					maxBitrate: maxAudioSize / (duration / 90000 / audioSizes.length),
-																					avgBitrate: (stream.tell() - audioStart) / (duration / 90000)
-																				},
-																				{
-																					descriptor_type: 5,
-																					ext_type: 128,
-																					length: 2,
-																					audio_profile: audioHeader.profileMinusOne + 1,
-																					sampling_freq: audioHeader.samplingFreq,
-																					channelConfig: audioHeader.channelConfig
-																				},
-																				{
-																					descriptor_type: 6,
-																					ext_type: 128,
-																					length: 1,
-																					sl: 2
-																				}
-																			]
-																		}]
-																	}
-																}]
-															}],
-															stts: [{
-																version: 0,
-																flags: 0,
-																entries: [{
-																	sample_count: audioSizes.length,
-																	sample_delta: duration / audioSizes.length
-																}]
-															}],
-															stsc: [{
-																version: 0,
-																flags: 0,
-																entries: [{
-																	first_chunk: 1,
-																	samples_per_chunk: audioSizes.length,
-																	sample_description_index: 1
-																}]
-															}],
-															stsz: [{
-																version: 0,
-																flags: 0,
-																sample_size: 0,
-																sample_count: audioSizes.length,
-																sample_sizes: audioSizes
-															}],
-															stco: [{
-																version: 0,
-																flags: 0,
-																entries: [0x28 + audioStart]
-															}]
-														}
+												}],
+												stts: [{
+													version: 0,
+													flags: 0,
+													entries: [{
+														sample_count: audioSizes.length,
+														sample_delta: duration / audioSizes.length
 													}]
-												}
-											}]
-										}
-									}]
-								}
-							};
-				trak_data.push(trak_audio);
+												}],
+												stsc: [{
+													version: 0,
+													flags: 0,
+													entries: [{
+														first_chunk: 1,
+														samples_per_chunk: audioSizes.length,
+														sample_description_index: 1
+													}]
+												}],
+												stsz: [{
+													version: 0,
+													flags: 0,
+													sample_size: 0,
+													sample_count: audioSizes.length,
+													sample_sizes: audioSizes
+												}],
+												stco: [{
+													version: 0,
+													flags: 0,
+													entries: [0x28 + audioStart]
+												}]
+											}
+										}]
+									}
+								}]
+							}
+						}]
+					}
+				});
 			};
 			
 			file.write('File', {
@@ -517,7 +515,7 @@ addEventListener('message', function (event) {
 							},
 							next_track_ID: 2
 						}],
-						trak: trak_data,
+						trak: trak
 					}
 				}]
 			});
