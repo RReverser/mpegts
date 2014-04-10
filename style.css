@@ -35,9 +35,16 @@ h1 {
 }
 #play {
 	margin-right: 5px;
+	display: none;
 }
 #pause {
 	margin-left: 5px;
+}
+body.paused #play {
+	display: inline-block;
+}
+body.paused #pause {
+	display: none;
 }
 /* button 
 ---------------------------------------------- */

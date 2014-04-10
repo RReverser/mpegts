@@ -30,6 +30,7 @@
 
 		['play', 'pause'].forEach(function (action) {
 			document.getElementById(action).addEventListener('click', function () {
+				document.body.classList.toggle('paused');
 				converter.currentVideo[action]();
 			});
 		});
