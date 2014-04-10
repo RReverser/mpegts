@@ -13,15 +13,15 @@
 		<br />
 		<input class="button orange" type="button" id="play" value="Play" /><input class="button black" type="button" id="pause" value="Pause" />
 	</main>
-	<img id="loading-indicator" src="ajax-loader.gif" />
+	<img id="loading-indicator" src="assets/ajax-loader.gif" />
 	<div>
-		<img src="chrome.png" />
-		<img id="img-center" src="firefox.png" />
-		<img src="ie10.png" />
+		<img src="assets/chrome.png" />
+		<img id="img-center" src="assets/firefox.png" />
+		<img src="assets/ie10.png" />
 	</div>
 	<h3>Works best in Chrome (stable branch), having lags when switching videos but still working in latest Firefox and IE10+.</h3>
 	<p id="comments">Please note that demo uses 3rd-party <a href="http://www.mediamotiononline.com/">HLS demo source</a> and service <a href="http://www.corsproxy.com/">http://www.corsproxy.com/</a> for proxying it with needed Cross-Origin-Request headers, so it may be unstable.</p>
-    <script src="index.js" data-canvas="canvas" data-hls="http://d3sporhxbkob1v.cloudfront.net/bill/vod/sample-video/400k.m3u8">
+	<script src="index.js" data-canvas="canvas" data-hls="http://d3sporhxbkob1v.cloudfront.net/bill/vod/sample-video/400k.m3u8">
 		// UI initialization when first video chunk is converted
 
 		document.body.classList.remove('loading');
