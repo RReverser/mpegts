@@ -7,26 +7,21 @@
 </head>
 <body class="loading" style="text-align: center">
 	<a href="https://github.com/RReverser/mpegts"><img style="position: absolute; top: 0; right: 0; border: 0;" src="https://s3.amazonaws.com/github/ribbons/forkme_right_orange_ff7600.png" alt="Fork me on GitHub"></a>
-
 	<h1>HTTP Live Streaming </br>JavaScript converter and player demo</h1>
-	
-	
 	<main>
 		<div id="video-streaming"><canvas id="canvas" style="border: 1px solid black; background: white"></canvas></div>
 		<br />
 		<input class="button orange" type="button" id="play" value="Play" /><input class="button black" type="button" id="pause" value="Pause" />
 	</main>
 	<img id="loading-indicator" src="ajax-loader.gif" />
-	<div><img src="chrome.png" />
+	<div>
+		<img src="chrome.png" />
 		<img id="img-center" src="firefox.png" />
-		<img src="ie10.png" /></div>
+		<img src="ie10.png" />
+	</div>
 	<h3>Works best in Chrome (stable branch), having lags when switching videos but still working in latest Firefox and IE10+.</h3>
 	<p id="comments">Please note that demo uses 3rd-party <a href="http://www.mediamotiononline.com/">HLS demo source</a> and service <a href="http://www.corsproxy.com/">http://www.corsproxy.com/</a> for proxying it with needed Cross-Origin-Request headers, so it may be unstable.</p>
-    <script>
-        document.body.classList.remove('loading');
-    </script>
-    <!--
-	<script src="index.js" data-canvas="canvas" data-hls="http://d3sporhxbkob1v.cloudfront.net/bill/vod/sample-video/400k.m3u8">
+    <script src="index.js" data-canvas="canvas" data-hls="http://d3sporhxbkob1v.cloudfront.net/bill/vod/sample-video/400k.m3u8">
 		// UI initialization when first video chunk is converted
 
 		document.body.classList.remove('loading');
@@ -45,6 +40,5 @@
 			video.paused ? video.play() : video.pause();
 		});
 	</script>
-	-->
 </body>
 </html>
