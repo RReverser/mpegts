@@ -50,13 +50,11 @@ body.paused #pause {
 	/* zoom and *display = ie7 hack for display:inline-block */
 	*display: inline;
 	vertical-align: baseline;
-	margin: 0 2px;
 	outline: none;
 	cursor: pointer;
 	text-align: center;
 	text-decoration: none;
 	font: 14px/100% Arial, Helvetica, sans-serif;
-	padding: .5em 2em .55em;
 	text-shadow: 0 1px 1px rgba(0, 0, 0, .3);
 	-webkit-border-radius: .5em;
 	-moz-border-radius: .5em;
