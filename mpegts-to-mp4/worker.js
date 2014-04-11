@@ -1,5 +1,6 @@
 importScripts(
-	'console.worker.js',
+	'../shim/console.worker.js',
+	'../shim/console.time.js',
 	'//jdataview.github.io/dist/jdataview.js',
 	'//jdataview.github.io/dist/jbinary.js',
 	'mpegts.js',

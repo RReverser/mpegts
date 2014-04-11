@@ -1,31 +1,10 @@
-(function (scripts) {
-	// console.time[End]() polyfill
-	if (!('time' in console)) {
-		(function (nowHost) {
-			var timeStarts = {}, avg = {};
-
-			this.time = function (id) {
-				timeStarts[id] = nowHost.now();
-			};
-
-			this.timeEnd = function (id) {
-				var delta = nowHost.now() - timeStarts[id];
-				if (!(id in avg)) {
-					avg[id] = {sum: 0, count: 0, valueOf: function () { return this.sum / this.count }};
-				}
-				avg[id].sum += delta;
-				avg[id].count++;
-				this.log(id + ': ' + delta + ' ms');
-				delete timeStarts[id];
-			};
-		}).call(console, typeof performance !== 'undefined' && 'now' in performance ? performance : Date);
-	}
-
+(function () {
 	// requestAnimationFrame polyfill
 	window.requestAnimationFrame = window.requestAnimationFrame || window.mozRequestAnimationFrame || window.webkitRequestAnimationFrame || window.msRequestAnimationFrame || setTimeout;
 
 	// preconfiguration using <script>'s data-attributes values
-	var script = scripts[scripts.length - 1],
+	var scripts = document.getElementsByTagName('script'),
+		script = scripts[scripts.length - 1],
 		worker = new Worker('mpegts-to-mp4/worker.js'),
 		nextIndex = 0,
 		sentVideos = 0,
@@ -124,7 +103,7 @@
 			resolver = doc.createElement('a'),
 			resolved_url;
 
-		return function resolveURL(base_url, url) {
+		return function (base_url, url) {
 			old_base || doc_head.appendChild(our_base);
 
 			our_base.href = base_url;
@@ -163,4 +142,4 @@
 	}
 
 	getMore();
-})(document.getElementsByTagName('script'));
+})();
