@@ -35,12 +35,6 @@
 				converter.currentVideo[action]();
 			});
 		});
-
-		this.canvas.addEventListener('click', function () {
-			var video = converter.currentVideo;
-			if (!video) return;
-			video.paused ? video.play() : video.pause();
-		});
 	</script>
 </body>
 </html>
