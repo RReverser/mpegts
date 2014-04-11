@@ -1,6 +1,4 @@
-(function (exports) {
-
-var H264 = {
+this.H264 = {
 	ExpGolomb: jBinary.Type({
 		params: ['isSigned'],
 		read: function () {
@@ -114,11 +112,3 @@ var H264 = {
 		}
 	})
 };
-
-if (typeof module !== 'undefined' && exports === module.exports) {
-	module.exports = H264;
-} else {
-	exports.H264 = H264;
-}
-
-})(this);

@@ -1,4 +1,5 @@
 importScripts(
+	'console.worker.js',
 	'//jdataview.github.io/dist/jdataview.js',
 	'//jdataview.github.io/dist/jbinary.js',
 	'mpegts.js',
@@ -8,43 +9,6 @@ importScripts(
 	'adts.js',
 	'async.js'
 );
-
-// polyfilling Worker's console object
-if (typeof console === 'undefined') {
-	console = {};
-	['log', 'time', 'timeEnd'].forEach(function (action) {
-		console[action] = function () {
-			postMessage({
-				type: 'debug',
-				action: action,
-				args: Array.prototype.slice.call(arguments)
-			});
-		};
-	});
-} else {
-	if (!('time' in console)) {
-		(function (nowHost) {
-			var timeStarts = {}, avg = {};
-			this.time = function (id) {
-				timeStarts[id] = nowHost.now();
-			};
-			this.timeEnd = function (id) {
-				var delta = nowHost.now() - timeStarts[id];
-				if (!(id in avg)) {
-					avg[id] = {
-						sum: 0,
-						count: 0,
-						valueOf: function () { return this.sum / this.count }
-					};
-				}
-				avg[id].sum += delta;
-				avg[id].count++;
-				this.log(id + ': ' + delta + ' ms');
-				delete timeStarts[id];
-			};
-		}).call(console, typeof performance !== 'undefined' && 'now' in performance ? performance : Date);
-	}
-}
 
 addEventListener('message', function (event) {
 	// processing received sources one by one

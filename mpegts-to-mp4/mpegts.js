@@ -1,6 +1,4 @@
-(function (exports) {
-
-var MPEGTS = {
+this.MPEGTS = {
 	PCR: {
 		pts: 33,
 		_reserved: 6,
@@ -205,11 +203,3 @@ var MPEGTS = {
 		}
 	})
 };
-
-if (typeof module !== 'undefined' && exports === module.exports) {
-	module.exports = MPEGTS;
-} else {
-	exports.MPEGTS = MPEGTS;
-}
-
-})(this);

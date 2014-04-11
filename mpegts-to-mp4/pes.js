@@ -1,6 +1,4 @@
-(function (exports) {
-
-var PES = {
+this.PES = {
 	Flag: jBinary.Template({
 		baseType: 1,
 		params: ['dependentField'],
@@ -103,11 +101,3 @@ var PES = {
 		data: ['blob', function () { return this.binary.getContext('_end')._end - this.binary.tell() }]
 	}]
 };
-
-if (typeof module !== 'undefined' && exports === module.exports) {
-	module.exports = PES;
-} else {
-	exports.PES = PES;
-}
-
-})(this);

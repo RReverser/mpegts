@@ -1,6 +1,4 @@
-(function (exports) {
-
-var ADTS = {
+this.ADTS = {
 	ADTSPacket: {
 		_start: function () { return this.binary.tell() },
 		_syncWord: ['const', 12, 0xfff, true],
@@ -18,11 +16,3 @@ var ADTS = {
 		data: ['blob', function (context) { return context.frameLength - (this.binary.tell() - context._start) }]
 	}
 };
-
-if (typeof module !== 'undefined' && exports === module.exports) {
-	module.exports = ADTS;
-} else {
-	exports.ADTS = ADTS;
-}
-
-})(this);

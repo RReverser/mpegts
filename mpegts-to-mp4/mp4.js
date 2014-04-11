@@ -1,11 +1,14 @@
-(function (exports) {
+(function () {
+
 var timeBasis = new Date(1970, 0, 1) - new Date(1904, 0, 1);
 
-function toValue(prop, val) {
-	return val instanceof Function ? val.call(prop) : val;
+function atomFilter(type) {
+	return function (atom) {
+		return atom.type === type;
+	};
 }
 
-var MP4 = {
+this.MP4 = {
 	ShortName: ['string0', 4],
 	
 	Rate: ['FixedPoint', 'int32', 16],
@@ -104,7 +107,7 @@ var MP4 = {
 	Atoms: jBinary.Type({
 		params: ['end'],
 		read: function () {
-			var atoms = {}, end = toValue(this, this.end) || this.binary.getContext('_end')._end;
+			var atoms = {}, end = this.toValue(this.end) || this.binary.getContext('_end')._end;
 			while (this.binary.tell() < end) {
 				var item = this.binary.read('Box');
 				(atoms[item.type] || (atoms[item.type] = [])).push(item);
@@ -733,16 +736,4 @@ var MP4 = {
 	File: ['Atoms', function () { return this.binary.view.byteLength }]
 };
 
-function atomFilter(type) {
-	return function (atom) {
-		return atom.type === type;
-	};
-}
-
-if (typeof module !== 'undefined' && exports === module.exports) {
-	module.exports = MP4;
-} else {
-	exports.MP4 = MP4;
-}
-
-})(this);
+}).call(this);
