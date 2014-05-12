@@ -455,6 +455,8 @@ addEventListener('message', function (event) {
 				});
 			};
 			
+			var creationTime = new Date();
+
 			file.write('File', {
 				ftyp: [{
 					major_brand: 'isom',
@@ -469,6 +471,8 @@ addEventListener('message', function (event) {
 						mvhd: [{
 							version: 0,
 							flags: 0,
+							creation_time: creationTime,
+							modification_time: creationTime,
 							timescale: 90000,
 							duration: duration,
 							rate: 1,
