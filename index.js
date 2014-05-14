@@ -27,7 +27,7 @@
 				// got new converted MP4 video data
 				case 'video':
 					var xhr = new XMLHttpRequest();
-					xhr.open('GET', 'sample2.mp4', true);
+					xhr.open('GET', data.url, true);
 					xhr.responseType = 'arraybuffer';
 
 					xhr.onload = function (event) {
