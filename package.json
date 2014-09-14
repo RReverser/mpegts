@@ -1,6 +1,6 @@
 {
   "name": "mpegts_to_mp4",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Pure JavaScript MPEGTS->MP4 converter.",
   "main": "node.js",
   "bin": "node.js",

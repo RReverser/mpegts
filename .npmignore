@@ -1,0 +1,8 @@
+/.idea
+/lib
+/shim
+/browser.js
+/worker.js
+*.css
+*.png
+*.gif
