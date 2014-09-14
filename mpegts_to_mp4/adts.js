@@ -12,6 +12,8 @@
         root.ADTS = factory();
     }
 }(this, function () {
+	'use strict';
+
 	return {
 		ADTSPacket: {
 			_start: function () { return this.binary.tell() },

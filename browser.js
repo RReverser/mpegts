@@ -1,4 +1,6 @@
 (function () {
+	'use strict';
+
 	// requestAnimationFrame polyfill
 	window.requestAnimationFrame = window.requestAnimationFrame || window.mozRequestAnimationFrame || window.webkitRequestAnimationFrame || window.msRequestAnimationFrame || setTimeout;
 

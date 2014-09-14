@@ -12,6 +12,8 @@
         root.H264 = factory(root.jBinary);
     }
 }(this, function (jBinary) {
+	'use strict';
+
 	return {
 		ExpGolomb: jBinary.Type({
 			params: ['isSigned'],

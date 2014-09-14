@@ -12,6 +12,8 @@
         root.PES = factory(root.jBinary);
     }
 }(this, function (jBinary) {
+	'use strict';
+
 	return {
 		Flag: jBinary.Template({
 			baseType: 1,

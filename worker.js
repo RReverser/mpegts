@@ -1,3 +1,5 @@
+'use strict';
+
 importScripts('./lib/require.js');
 
 require.config({
