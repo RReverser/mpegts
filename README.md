@@ -1,5 +1,5 @@
-HTTP Live Streaming JavaScript player [![Bitdeli Badge](https://d2weczhvl823v0.cloudfront.net/RReverser/mpegts/trend.png)](https://bitdeli.com/free "Bitdeli Badge")
-======
+HTTP Live Streaming JavaScript player
+=====================================
 
 What's this?
 ------------
@@ -17,14 +17,22 @@ Where does it work?
 Works best in Chrome (stable branch), having more noticable lags when switching videos
 but still working in latest Firefox versions and IE10+.
 
-Disclaimer
-----------
-Please note that demo uses 3rd-party HLS demo source and service [http://www.corsproxy.com/](http://www.corsproxy.com/) for proxying it with
-needed Cross-Origin-Request headers for browsers to allow chunk downloading, so it may be unstable.
-
 Where I can see that?
 ---------------------
 Check out [http://rreverser.github.io/mpegts/](http://rreverser.github.io/mpegts/) for live demo.
 
 Screenshot:
 [![Screenshot](http://rreverser.github.io/mpegts/screenshot.png?)](http://rreverser.github.io/mpegts/)
+
+Disclaimer
+----------
+Please note that demo uses 3rd-party HLS demo source and service [http://www.corsproxy.com/](http://www.corsproxy.com/) for proxying it with
+needed Cross-Origin-Request headers for browsers to allow chunk downloading, so it may be unstable.
+
+Can I use it in Node.js?
+------------------------
+[Yes, you can.](NODE.md)
+
+What license is it issued under?
+--------------------------------
+It's regular [MIT license](MIT-license.txt).
