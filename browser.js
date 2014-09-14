@@ -5,7 +5,7 @@
 	// preconfiguration using <script>'s data-attributes values
 	var scripts = document.getElementsByTagName('script'),
 		script = scripts[scripts.length - 1],
-		worker = new Worker('mpegts-to-mp4/worker.js'),
+		worker = new Worker('worker.js'),
 		nextIndex = 0,
 		sentVideos = 0,
 		currentVideo = null,
@@ -28,6 +28,11 @@
 		var data = event.data, descriptor = '#' + data.index + ': ' + data.original;
 
 		switch (data.type) {
+			// worker is ready to convert
+			case 'ready':
+				getMore();
+				return;
+
 			// got debug message from worker
 			case 'debug':
 				Function.prototype.apply.call(console[data.action], console, data.args);
@@ -140,6 +145,4 @@
 		ajax.open('GET', manifest, true);
 		ajax.send();
 	}
-
-	getMore();
 })();
