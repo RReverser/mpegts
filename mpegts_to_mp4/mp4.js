@@ -101,7 +101,7 @@
 				}
 			},
 			write: function (time) {
-				this.baseWrite(time - timeBasis);
+				this.baseWrite((time - timeBasis) >>> 0);
 			}
 		}),
 
@@ -380,7 +380,7 @@
 				}
 			}),
 			depth: 'uint16',
-			_reserved3: ['const', 'uint16', -1]
+			_reserved3: ['const', 'int16', -1]
 		}, jBinary.Type({
 			setParams: function () {
 				this.optional = {

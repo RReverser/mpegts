@@ -386,8 +386,8 @@
 																	stream_type: 'audio',
 																	upstream_flag: 0,
 																	buffer_size: 0,
-																	maxBitrate: maxAudioSize / (duration / 90000 / audioSizes.length),
-																	avgBitrate: (stream.tell() - audioStart) / (duration / 90000)
+																	maxBitrate: Math.round(maxAudioSize / (duration / 90000 / audioSizes.length)),
+																	avgBitrate: Math.round((stream.tell() - audioStart) / (duration / 90000))
 																},
 																{
 																	descriptor_type: 5,
@@ -413,7 +413,7 @@
 												flags: 0,
 												entries: [{
 													sample_count: audioSizes.length,
-													sample_delta: duration / audioSizes.length
+													sample_delta: Math.round(duration / audioSizes.length)
 												}]
 											}],
 											stsc: [{
