@@ -81,64 +81,66 @@
 			}
 		}
 		
-		samples.push({offset: stream.tell()});
+		if (samples.length) {
+			samples.push({offset: stream.tell()});
 
-		var sizes = [],
-			dtsDiffs = [],
-			accessIndexes = [],
-			pts_dts_Diffs = [],
-			current = samples[0],
-			frameRate = {sum: 0, count: 0},
-			duration = 0;
-		
-		// calculating PTS/DTS differences and collecting keyframes
-		
-		for (var i = 0, length = samples.length - 1; i < length; i++) {
-			var next = samples[i + 1];
-			sizes.push(next.offset - current.offset);
-			var dtsDiff = next.dts - current.dts;
-			if (dtsDiff) {
-				dtsDiffs.push({sample_count: 1, sample_delta: dtsDiff});
-				duration += dtsDiff;
-				frameRate.sum += dtsDiff;
-				frameRate.count++;
-			} else {
-				dtsDiffs.length++;
+			var sizes = [],
+				dtsDiffs = [],
+				accessIndexes = [],
+				pts_dts_Diffs = [],
+				current = samples[0],
+				frameRate = {sum: 0, count: 0},
+				duration = 0;
+			
+			// calculating PTS/DTS differences and collecting keyframes
+			
+			for (var i = 0, length = samples.length - 1; i < length; i++) {
+				var next = samples[i + 1];
+				sizes.push(next.offset - current.offset);
+				var dtsDiff = next.dts - current.dts;
+				if (dtsDiff) {
+					dtsDiffs.push({sample_count: 1, sample_delta: dtsDiff});
+					duration += dtsDiff;
+					frameRate.sum += dtsDiff;
+					frameRate.count++;
+				} else {
+					dtsDiffs.length++;
+				}
+				if (current.isIDR) {
+					accessIndexes.push(i + 1);
+				}
+				pts_dts_Diffs.push({
+					first_chunk: pts_dts_Diffs.length + 1,
+					sample_count: 1,
+					sample_offset: current.dtsFix = current.pts - current.dts
+				});
+				current = next;
 			}
-			if (current.isIDR) {
-				accessIndexes.push(i + 1);
+			
+			frameRate = frameRate.sum / frameRate.count;
+			
+			for (var i = 0, length = dtsDiffs.length; i < length; i++) {
+				if (dtsDiffs[i] === undefined) {
+					dtsDiffs[i] = {first_chunk: i + 1, sample_count: 1, sample_delta: frameRate};
+					duration += frameRate;
+					//samples[i + 1].dts = samples[i].dts + frameRate;
+				}
 			}
-			pts_dts_Diffs.push({
-				first_chunk: pts_dts_Diffs.length + 1,
-				sample_count: 1,
-				sample_offset: current.dtsFix = current.pts - current.dts
-			});
-			current = next;
-		}
-		
-		frameRate = frameRate.sum / frameRate.count;
-		
-		for (var i = 0, length = dtsDiffs.length; i < length; i++) {
-			if (dtsDiffs[i] === undefined) {
-				dtsDiffs[i] = {first_chunk: i + 1, sample_count: 1, sample_delta: frameRate};
-				duration += frameRate;
-				//samples[i + 1].dts = samples[i].dts + frameRate;
+			
+			// checking if DTS differences are same everywhere to pack them into one item
+			
+			var dtsDiffsSame = true;
+			
+			for (var i = 1, length = dtsDiffs.length; i < length; i++) {
+				if (dtsDiffs[i].sample_delta !== dtsDiffs[0].sample_delta) {
+					dtsDiffsSame = false;
+					break;
+				}
 			}
-		}
-		
-		// checking if DTS differences are same everywhere to pack them into one item
-		
-		var dtsDiffsSame = true;
-		
-		for (var i = 1, length = dtsDiffs.length; i < length; i++) {
-			if (dtsDiffs[i].sample_delta !== dtsDiffs[0].sample_delta) {
-				dtsDiffsSame = false;
-				break;
+			
+			if (dtsDiffsSame) {
+				dtsDiffs = [{first_chunk: 1, sample_count: sizes.length, sample_delta: dtsDiffs[0].sample_delta}];
 			}
-		}
-		
-		if (dtsDiffsSame) {
-			dtsDiffs = [{first_chunk: 1, sample_count: sizes.length, sample_delta: dtsDiffs[0].sample_delta}];
 		}
 
 		// building audio metadata
@@ -148,7 +150,7 @@
 			audioSizes = [],
 			audioHeader,
 			maxAudioSize = 0;
-			
+
 		audioStream.seek(0);
 		
 		while (audioStream.tell() < audioSize) {
@@ -164,139 +166,143 @@
 
 		var mp4 = new jBinary(stream.byteLength, MP4);
 		
-		var trak = [{
-			atoms: {
-				tkhd: [{
-					version: 0,
-					flags: 15,
-					track_ID: 1,
-					duration: duration,
-					layer: 0,
-					alternate_group: 0,
-					volume: 1,
-					matrix: {
-						a: 1, b: 0, x: 0,
-						c: 0, d: 1, y: 0,
-						u: 0, v: 0, w: 1
-					},
-					dimensions: {
-						horz: width,
-						vert: height
-					}
-				}],
-				mdia: [{
-					atoms: {
-						mdhd: [{
-							version: 0,
-							flags: 0,
-							timescale: 90000,
-							duration: duration,
-							lang: 'und'
-						}],
-						hdlr: [{
-							version: 0,
-							flags: 0,
-							handler_type: 'vide',
-							name: 'VideoHandler'
-						}],
-						minf: [{
-							atoms: {
-								vmhd: [{
-									version: 0,
-									flags: 1,
-									graphicsmode: 0,
-									opcolor: {r: 0, g: 0, b: 0}
-								}],
-								dinf: [{
-									atoms: {
-										dref: [{
-											version: 0,
-											flags: 0,
-											entries: [{
-												type: 'url ',
+		var trak = [];
+
+		if (samples.length) {
+			trak.push({
+				atoms: {
+					tkhd: [{
+						version: 0,
+						flags: 15,
+						track_ID: 1,
+						duration: duration,
+						layer: 0,
+						alternate_group: 0,
+						volume: 1,
+						matrix: {
+							a: 1, b: 0, x: 0,
+							c: 0, d: 1, y: 0,
+							u: 0, v: 0, w: 1
+						},
+						dimensions: {
+							horz: width,
+							vert: height
+						}
+					}],
+					mdia: [{
+						atoms: {
+							mdhd: [{
+								version: 0,
+								flags: 0,
+								timescale: 90000,
+								duration: duration,
+								lang: 'und'
+							}],
+							hdlr: [{
+								version: 0,
+								flags: 0,
+								handler_type: 'vide',
+								name: 'VideoHandler'
+							}],
+							minf: [{
+								atoms: {
+									vmhd: [{
+										version: 0,
+										flags: 1,
+										graphicsmode: 0,
+										opcolor: {r: 0, g: 0, b: 0}
+									}],
+									dinf: [{
+										atoms: {
+											dref: [{
 												version: 0,
-												flags: 1,
-												location: ''
+												flags: 0,
+												entries: [{
+													type: 'url ',
+													version: 0,
+													flags: 1,
+													location: ''
+												}]
 											}]
-										}]
-									}
-								}],
-								stbl: [{
-									atoms: {
-										stsd: [{
-											version: 0,
-											flags: 0,
-											entries: [{
-												type: 'avc1',
-												data_reference_index: 1,
-												dimensions: {
-													horz: width,
-													vert: height
-												},
-												resolution: {
-													horz: 72,
-													vert: 72
-												},
-												frame_count: 1,
-												compressorname: '',
-												depth: 24,
-												atoms: {
-													avcC: [{
-														version: 1,
-														profileIndication: spsInfo.profile_idc,
-														profileCompatibility: parseInt(spsInfo.constraint_set_flags.join(''), 2),
-														levelIndication: spsInfo.level_idc,
-														lengthSizeMinusOne: 3,
-														seqParamSets: [sps],
-														pictParamSets: [pps]
-													}]
-												}
+										}
+									}],
+									stbl: [{
+										atoms: {
+											stsd: [{
+												version: 0,
+												flags: 0,
+												entries: [{
+													type: 'avc1',
+													data_reference_index: 1,
+													dimensions: {
+														horz: width,
+														vert: height
+													},
+													resolution: {
+														horz: 72,
+														vert: 72
+													},
+													frame_count: 1,
+													compressorname: '',
+													depth: 24,
+													atoms: {
+														avcC: [{
+															version: 1,
+															profileIndication: spsInfo.profile_idc,
+															profileCompatibility: parseInt(spsInfo.constraint_set_flags.join(''), 2),
+															levelIndication: spsInfo.level_idc,
+															lengthSizeMinusOne: 3,
+															seqParamSets: [sps],
+															pictParamSets: [pps]
+														}]
+													}
+												}]
+											}],
+											stts: [{
+												version: 0,
+												flags: 0,
+												entries: dtsDiffs
+											}],
+											stss: [{
+												version: 0,
+												flags: 0,
+												entries: accessIndexes
+											}],
+											ctts: [{
+												version: 0,
+												flags: 0,
+												entries: pts_dts_Diffs
+											}],
+											stsc: [{
+												version: 0,
+												flags: 0,
+												entries: [{
+													first_chunk: 1,
+													samples_per_chunk: sizes.length,
+													sample_description_index: 1
+												}]
+											}],
+											stsz: [{
+												version: 0,
+												flags: 0,
+												sample_size: 0,
+												sample_count: sizes.length,
+												sample_sizes: sizes
+											}],
+											stco: [{
+												version: 0,
+												flags: 0,
+												entries: [0x28]
 											}]
-										}],
-										stts: [{
-											version: 0,
-											flags: 0,
-											entries: dtsDiffs
-										}],
-										stss: [{
-											version: 0,
-											flags: 0,
-											entries: accessIndexes
-										}],
-										ctts: [{
-											version: 0,
-											flags: 0,
-											entries: pts_dts_Diffs
-										}],
-										stsc: [{
-											version: 0,
-											flags: 0,
-											entries: [{
-												first_chunk: 1,
-												samples_per_chunk: sizes.length,
-												sample_description_index: 1
-											}]
-										}],
-										stsz: [{
-											version: 0,
-											flags: 0,
-											sample_size: 0,
-											sample_count: sizes.length,
-											sample_sizes: sizes
-										}],
-										stco: [{
-											version: 0,
-											flags: 0,
-											entries: [0x28]
-										}]
-									}
-								}]
-							}
-						}]
-					}
-				}]
-			}
-		}];
+										}
+									}]
+								}
+							}]
+						}
+					}]
+				}
+			});
+		}
 
 		if (audioSize > 0) {
 			trak.push({
