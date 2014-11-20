@@ -30,12 +30,12 @@
 			audioStream = new jBinary(stream.byteLength, ADTS),
 			samples = [],
 			audioSamples = [];
-		
+
 		stream = new jDataView(stream.byteLength);
 		
 		while (pesStream.tell() < pesStream.view.byteLength) {
 			var packet = pesStream.read('PESPacket');
-			
+
 			if (packet.streamId === 0xC0) {
 				// 0xC0 means we have got first audio stream
 				audioStream.write('blob', packet.data);
@@ -116,7 +116,7 @@
 			current = next;
 		}
 		
-		frameRate = frameRate.sum / frameRate.count;
+		frameRate = Math.round(frameRate.sum / frameRate.count);
 		
 		for (var i = 0, length = dtsDiffs.length; i < length; i++) {
 			if (dtsDiffs[i] === undefined) {
@@ -125,7 +125,7 @@
 				//samples[i + 1].dts = samples[i].dts + frameRate;
 			}
 		}
-		
+
 		// checking if DTS differences are same everywhere to pack them into one item
 		
 		var dtsDiffsSame = true;

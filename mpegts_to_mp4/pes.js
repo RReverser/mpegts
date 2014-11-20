@@ -66,7 +66,15 @@
 				var pos = this.binary.tell(), length = context.length;
 
 				if (length) {
-					return pos + length;
+					pos += length;
+					if (pos > this.view.byteLength - 4) {
+						return pos;
+					}
+					var bytes = this.binary.read(['blob', 4], pos);
+					if (bytes[0] === 0 && bytes[1] === 0 && bytes[2] === 1 && (bytes[3] & 0x80)) {
+						return pos;
+					}
+					pos -= length;
 				}
 
 				/*
@@ -74,7 +82,7 @@
 				(according to specification, it may be written as zero for video streams of undefined length)
 				but should work for H.264 streams since NAL unit types always have clear highest bit (`forbidden_zero_bit`)
 				*/
-				var fileEnd = this.binary.view.byteLength, bytes = this.binary.seek(pos, function () { return this.view.getBytes() });
+				var fileEnd = this.view.byteLength, bytes = this.binary.read('blob', pos);
 				for (var i = 0; i < bytes.length - 4; i++) {
 					if (bytes[i] === 0 && bytes[i + 1] === 0 && bytes[i + 2] === 1 && (bytes[i + 3] & 0x80)) {
 						return pos + i;
