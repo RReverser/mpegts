@@ -42,7 +42,9 @@
 			} else
 			if (packet.streamId === 0xE0) {
 				var nalStream = new jBinary(packet.data, H264),
-					curSample = {offset: stream.tell(), pts: packet.pts, dts: packet.dts || packet.pts};
+					pts = packet.pts,
+					dts = packet.dts,
+					curSample = {offset: stream.tell(), pts: pts, dts: dts !== undefined ? dts : pts};
 				
 				samples.push(curSample);
 				
