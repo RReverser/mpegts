@@ -24,6 +24,13 @@ function HLSPlayer(canvas, manifestUrl, options) {
 
   canvas.play = function() { if(currentVideo) currentVideo.play(); };
   canvas.pause = function() { if(currentVideo) currentVideo.pause(); };
+  canvas.stop = function() {
+    if(currentVideo) currentVideo.pause();
+    if(worker) {
+      worker.terminate();
+      worker = null;
+    }
+  }
 
   // drawing new frame
   function nextFrame() {
