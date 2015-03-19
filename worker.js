@@ -1,27 +1,5 @@
 'use strict';
 
-importScripts('./lib/require.js');
-
-require.config({
-	paths: {
-		jdataview: '//jdataview.github.io/dist/jdataview',
-		jbinary: '//jdataview.github.io/dist/jbinary',
-		async: 'lib/async',
-		consoleTime: './shim/console.time',
-		consoleWorker: './shim/console.worker'
-	},
-	shim: {
-		consoleTime: {
-			deps: ['consoleWorker'],
-			exports: 'console'
-		},
-		consoleWorker: {
-			deps: [],
-			exports: 'console'
-		}
-	}
-});
-
 require(['async', 'jbinary', './mpegts_to_mp4/mpegts', './mpegts_to_mp4/index', 'consoleTime', 'consoleWorker'],
 	function (async, jBinary, MPEGTS, mpegts_to_mp4) {
 		addEventListener('message', function (event) {
@@ -35,7 +13,7 @@ require(['async', 'jbinary', './mpegts_to_mp4/mpegts', './mpegts_to_mp4/index', 
 					console.time('convert');
 					var mp4 = mpegts_to_mp4(mpegts);
 					console.timeEnd('convert');
-					
+
 					postMessage({
 						type: 'video',
 						index: msg.index,
@@ -49,3 +27,5 @@ require(['async', 'jbinary', './mpegts_to_mp4/mpegts', './mpegts_to_mp4/index', 
 		postMessage({type: 'ready'});
 	}
 );
+
+

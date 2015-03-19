@@ -1,0 +1,26 @@
+{
+  "name": "mpegts_to_mp4",
+  "version": "1.0.1",
+  "homepage": "https://github.com/RReverser/mpegts",
+  "authors": [
+    "Ingvar Stepanyan <me@rreverser.com> (http://rreverser.com/)"
+  ],
+  "main": "dist/hlsplayer.js",
+  "license": "MIT",
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "test",
+    "tests"
+  ],
+  "dependencies": {
+    "jbinary": "~2.1.2",
+    "jdataview": "~2.5.0",
+    "async": "~0.9.2"
+  },
+  "devDependencies": {
+    "requirejs": "~2.1.16",
+    "almond": "~0.3.1"
+  }
+}

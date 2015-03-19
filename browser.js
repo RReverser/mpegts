@@ -7,7 +7,7 @@
 	// preconfiguration using <script>'s data-attributes values
 	var scripts = document.getElementsByTagName('script'),
 		script = scripts[scripts.length - 1],
-		worker = new Worker('worker.js'),
+		worker = new Worker('worker-main.js'),
 		nextIndex = 0,
 		sentVideos = 0,
 		currentVideo = null,
