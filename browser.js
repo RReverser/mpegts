@@ -46,7 +46,7 @@
 				source.type = 'video/mp4';
 				video.appendChild(source);
 
-				video.addEventListener('loadedmetadata', function () {
+				video.addEventListener('loadeddata', function () {
 					if (canvas.width !== this.videoWidth || canvas.height !== this.videoHeight) {
 						canvas.width = this.width = this.videoWidth;
 						canvas.height = this.height = this.videoHeight;
