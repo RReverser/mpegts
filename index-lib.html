@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>HLS converter and player demo</title>
+  <script src="dist/hlsplayer.js"></script>
+</head>
+<body >
+  <canvas id="canvas"></canvas>
+
+  <div>
+    <button onclick="canvas.play()">Play</button>
+    <button onclick="canvas.pause()">Pause</button>
+    <button onclick="canvas.stop()">Stop</button>
+  </div>
+
+  <script type="text/javascript">
+
+    var canvas = document.getElementById("canvas");
+    var url = "http://d3sporhxbkob1v.cloudfront.net/bill/vod/sample-video/400k.m3u8";
+
+    new HLSPlayer(canvas, url, {
+      autoplay: true,
+      canplay: function() {
+        console.log("ready to play first segment!")
+      }
+    });
+
+  </script>
+</body>
+</html>

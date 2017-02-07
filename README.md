@@ -37,3 +37,10 @@ Can I use it in Node.js?
 What license is it issued under?
 --------------------------------
 It's regular [MIT license](MIT-license.txt).
+
+Running locally and building as a library
+--------------------------------
+* Install development dependencies using `npm install`
+* Install runtime dependencies using `bower install`
+* Build the the library and open the demo by simply running `gulp`
+* For an example of using the library, see index-lib.html
